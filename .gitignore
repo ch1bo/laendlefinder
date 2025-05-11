@@ -1,2 +1,4 @@
-.aider*
-.env
+/target
+**/*.rs.bk
+Cargo.lock
+*.csv
