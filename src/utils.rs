@@ -16,7 +16,14 @@ pub fn read_cookies_file(path: &str) -> Result<String> {
         .trim()
         .to_string();
     
-    Ok(cleaned_cookies)
+    // Further sanitize the cookie string to ensure it's a valid header value
+    // Remove any characters that might cause issues in HTTP headers
+    let sanitized_cookies = cleaned_cookies
+        .chars()
+        .filter(|&c| !c.is_control() && c != '\r' && c != '\n')
+        .collect::<String>();
+    
+    Ok(sanitized_cookies)
 }
 
 pub fn save_to_csv(properties: &[Property], filename: &str) -> Result<()> {

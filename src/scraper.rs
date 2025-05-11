@@ -59,7 +59,16 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     
     if let Some(cookie_str) = cookies {
         println!("Using cookies: {}", cookie_str);
-        request = request.header("Cookie", cookie_str);
+        // Try to add cookies, but continue even if it fails
+        match reqwest::header::HeaderValue::from_str(cookie_str) {
+            Ok(header_value) => {
+                request = request.header("Cookie", header_value);
+            },
+            Err(e) => {
+                println!("Warning: Could not use cookies due to invalid format: {}", e);
+                println!("Continuing without cookies");
+            }
+        }
     } else {
         println!("No cookies provided");
     }
