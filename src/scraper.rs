@@ -215,7 +215,7 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     // Create and return the Property
     Ok(Property {
         url: url.to_string(),
-        price,
+        price: price.to_string(),
         location,
         property_type,
         date: None,
@@ -294,7 +294,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     // Create and return the Property
     Ok(Property {
         url: url.to_string(),
-        price,
+        price: price.to_string(),
         location,
         property_type,
         date,
