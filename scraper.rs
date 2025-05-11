@@ -62,7 +62,6 @@ fn scrape_index_page_with_number(page_number: usize) -> Result<Vec<String>> {
     let document = Html::parse_document(&html);
     
     // Extract property URLs from the page
-    // This selector needs to be adjusted based on the actual HTML structure
     let article_selector = Selector::parse("article a.article-link").unwrap();
     
     let property_urls: Vec<String> = document
@@ -77,6 +76,29 @@ fn scrape_index_page_with_number(page_number: usize) -> Result<Vec<String>> {
             })
         })
         .collect();
+    
+    // If no property URLs found with the article selector, try to extract from JSON data
+    if property_urls.is_empty() {
+        println!("No property URLs found with article selector, trying JSON data extraction");
+        let script_selector = Selector::parse("#topicDataNode").unwrap();
+        if let Some(script) = document.select(&script_selector).next() {
+            let json_str = script.inner_html();
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                if let Some(hits) = json["prefetchedRawData"]["hits"].as_array() {
+                    let json_urls: Vec<String> = hits.iter()
+                        .filter_map(|hit| {
+                            hit["link"].as_str().map(|link| {
+                                link.replace(r"\/", "/").to_string()
+                            })
+                        })
+                        .collect();
+                    
+                    println!("Found {} property URLs from JSON data", json_urls.len());
+                    return Ok(json_urls);
+                }
+            }
+        }
+    }
     
     Ok(property_urls)
 }
