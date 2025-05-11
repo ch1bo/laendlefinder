@@ -198,7 +198,22 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     // Parse the headline using regex patterns
     let price = parser::extract_price(&headline)?;
     let location = parser::extract_location(&headline)?;
-    let property_type = parser::extract_property_type(&headline)?;
+    
+    // Try to extract property type, but don't fail if not found
+    let property_type = match parser::extract_property_type(&headline) {
+        Ok(pt) => pt,
+        Err(_) => {
+            // Use the third word of the title as fallback
+            let words: Vec<&str> = headline.split_whitespace().collect();
+            if words.len() >= 3 {
+                println!("Using third word of title as property type fallback: {}", words[2]);
+                words[2].to_string()
+            } else {
+                println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
+                "Grundstück".to_string()
+            }
+        }
+    };
     
     println!("Extracted data: price={}, location={}, type={}", 
              price, location, property_type);
@@ -231,7 +246,22 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     // Extract price, location, and property type from the title
     let price = parser::extract_price(title)?;
     let location = parser::extract_location(title)?;
-    let property_type = parser::extract_property_type(title)?;
+    
+    // Try to extract property type, but don't fail if not found
+    let property_type = match parser::extract_property_type(title) {
+        Ok(pt) => pt,
+        Err(_) => {
+            // Use the third word of the title as fallback
+            let words: Vec<&str> = title.split_whitespace().collect();
+            if words.len() >= 3 {
+                println!("Using third word of title as property type fallback: {}", words[2]);
+                words[2].to_string()
+            } else {
+                println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
+                "Grundstück".to_string()
+            }
+        }
+    };
     
     // Try to extract the transaction date and coordinates from the structured data
     let mut date = None;
