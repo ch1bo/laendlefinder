@@ -220,6 +220,9 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         property_type,
         date: None,
         description: None,
+        coordinates: None,
+        address: None,
+        size_living: None,
     })
 }
 
@@ -239,8 +242,11 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     let location = parser::extract_location(title)?;
     let property_type = parser::extract_property_type(title)?;
     
-    // Try to extract the transaction date from the structured data
+    // Try to extract the transaction date and coordinates from the structured data
     let mut date = None;
+    let mut coordinates = None;
+    let mut address = None;
+    let mut size_living = None;
     
     // Look for the GrundUndBoden block which contains structured data
     if let Some(blocks) = post["blocks"].as_array() {
@@ -252,12 +258,35 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
                     
                     // Parse the data attribute which is a JSON string
                     if let Ok(data_json) = serde_json::from_str::<Value>(data_str) {
+                        println!("Found grund-und-boden data: {}", data_str);
+                        
+                        // Extract transaction date
                         if let Some(date_str) = data_json["transactionDate"].as_str() {
                             println!("Found transaction date: {}", date_str);
                             // Parse the date in format YYYY-MM-DD
                             if let Ok(parsed_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
                                 date = Some(parsed_date);
                             }
+                        }
+                        
+                        // Extract coordinates
+                        if let Some(coords) = data_json["coords"].as_object() {
+                            if let (Some(lat), Some(lng)) = (coords["lat"].as_f64(), coords["lng"].as_f64()) {
+                                coordinates = Some((lat, lng));
+                                println!("Found coordinates: lat={}, lng={}", lat, lng);
+                            }
+                        }
+                        
+                        // Extract address
+                        if let Some(addr) = data_json["address"].as_str() {
+                            address = Some(addr.to_string());
+                            println!("Found address: {}", addr);
+                        }
+                        
+                        // Extract living size
+                        if let Some(size) = data_json["sizeLiving"].as_str() {
+                            size_living = Some(size.to_string());
+                            println!("Found living size: {}", size);
                         }
                     }
                 }
@@ -299,5 +328,8 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
         property_type,
         date,
         description,
+        coordinates,
+        address,
+        size_living,
     })
 }
