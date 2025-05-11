@@ -80,12 +80,13 @@
         // Function to parse CSV data
         async function loadCSVData() {
             try {
-                const response = await fetch('../data/properties.csv');
+                const response = await fetch('properties.csv');
                 const csvData = await response.text();
                 
                 Papa.parse(csvData, {
                     header: true,
                     complete: function(results) {
+                        console.log(results.data);
                         displayProperties(results.data);
                         document.getElementById('loading').style.display = 'none';
                     },
@@ -133,12 +134,11 @@
             container.className = 'info-container';
             
             // Title
-            if (property.title) {
-                const title = document.createElement('div');
-                title.className = 'info-title';
-                title.textContent = property.title;
-                container.appendChild(title);
-            }
+            const title = document.createElement('a');
+            title.className = 'info-title';
+            title.href = property.url;
+            title.textContent = property.url;
+            container.appendChild(title);
             
             // Price
             if (property.price) {
@@ -168,7 +168,7 @@
             if (property.description) {
                 const description = document.createElement('div');
                 description.className = 'info-description';
-                description.textContent = property.description;
+                description.innerHTML = property.description;
                 container.appendChild(description);
             }
             

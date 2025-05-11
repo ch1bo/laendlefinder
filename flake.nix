@@ -14,7 +14,7 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        
+
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
         };
@@ -26,22 +26,18 @@
             pkg-config
             openssl
             openssl.dev
-            
-            # Additional tools that might be useful
-            cargo-watch
-            cargo-edit
+            simple-http-server
           ];
-          
+
           shellHook = ''
             echo "LeandleFinder Development Environment"
             echo "--------------------------------------"
             echo "Run 'cargo run' to start the scraper"
-            echo "Run 'cargo build' to build the project"
-            echo "Run 'cargo test' to run tests"
+            echo "Run 'simple-http-server web -i -o' to start the visualization"
           '';
-          
+
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
-          
+
           # Set SSL certificate path for reqwest
           SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         };
