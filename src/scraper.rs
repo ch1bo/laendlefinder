@@ -240,7 +240,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     let property_type = parser::extract_property_type(title)?;
     
     // Try to extract the transaction date from the structured data
-    let mut date_string = None;
+    let mut date = None;
     
     // Look for the GrundUndBoden block which contains structured data
     if let Some(blocks) = post["blocks"].as_array() {
@@ -256,8 +256,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
                             println!("Found transaction date: {}", date_str);
                             // Parse the date in format YYYY-MM-DD
                             if let Ok(parsed_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                                // Convert NaiveDate to String in the format expected by Property
-                                date_string = Some(parsed_date.format("%Y-%m-%d").to_string());
+                                date = Some(parsed_date);
                             }
                         }
                     }
@@ -290,7 +289,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     }
     
     println!("Extracted data from JSON: price={}, location={}, type={}, date={:?}", 
-             price, location, property_type, date_string);
+             price, location, property_type, date);
     
     // Create and return the Property
     Ok(Property {
@@ -298,7 +297,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
         price,
         location,
         property_type,
-        date: date_string,
+        date,
         description,
     })
 }
