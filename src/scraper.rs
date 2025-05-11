@@ -14,11 +14,19 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     let html = response.text()
         .context("Failed to get response text")?;
     
+    // Print the first 500 characters of HTML for debugging
+    println!("First 500 chars of HTML: {}", &html[..500.min(html.len())]);
+    
     // Parse the HTML
     let document = Html::parse_document(&html);
     
     // Select article links - this selector will need to be adjusted based on actual HTML structure
     let article_selector = Selector::parse("article a.article-link").unwrap();
+    
+    // Print all article elements found for debugging
+    println!("Looking for elements matching: article a.article-link");
+    let articles: Vec<_> = document.select(&article_selector).collect();
+    println!("Found {} article elements", articles.len());
     
     // Extract links
     let mut links = Vec::new();
