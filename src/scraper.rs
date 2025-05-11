@@ -1,6 +1,6 @@
 use crate::models::Property;
 use crate::parser;
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context};
 use scraper::{Html, Selector};
 use serde_json::Value;
 use chrono::NaiveDate;
@@ -225,10 +225,10 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         location,
         property_type,
         date: None,
-        description: None,
         coordinates: None,
         address: None,
         size_living: None,
+        description: None,
     })
 }
 
@@ -348,9 +348,9 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
         location,
         property_type,
         date,
-        description,
         coordinates,
         address,
         size_living,
+        description,
     })
 }

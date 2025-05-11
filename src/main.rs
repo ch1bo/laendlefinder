@@ -37,7 +37,7 @@ fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<St
         .collect();
     
     // Only scrape properties that aren't already in our database
-    for (index, url) in property_urls.into_iter().enumerate() {
+    for (_index, url) in property_urls.into_iter().enumerate() {
         // Check if we've reached the maximum number of items
         if let Some(max) = max_items {
             if new_properties.len() >= max {
