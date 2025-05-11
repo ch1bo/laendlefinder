@@ -5,7 +5,18 @@ use std::fs;
 use crate::models::Property;
 
 pub fn read_cookies_file(path: &str) -> Result<String> {
-    fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read cookies file: {}", e))
+    let content = fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read cookies file: {}", e))?;
+    
+    // Strip newlines and any extra whitespace
+    let cleaned_cookies = content
+        .lines()
+        .collect::<Vec<&str>>()
+        .join("")
+        .trim()
+        .to_string();
+    
+    Ok(cleaned_cookies)
 }
 
 pub fn save_to_csv(properties: &[Property], filename: &str) -> Result<()> {
