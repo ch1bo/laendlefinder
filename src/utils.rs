@@ -69,11 +69,7 @@ pub fn load_properties_from_csv(input_path: &str) -> Result<Vec<Property>> {
             None
         };
         
-        let description = record.get(5).map(|s| {
-            if s.is_empty() { None } else { Some(s.to_string()) }
-        }).unwrap_or(None);
-        
-        let coordinates = record.get(6).and_then(|s| {
+        let coordinates = record.get(5).and_then(|s| {
             if s.is_empty() { 
                 None 
             } else {
@@ -88,11 +84,15 @@ pub fn load_properties_from_csv(input_path: &str) -> Result<Vec<Property>> {
             }
         });
         
-        let address = record.get(7).map(|s| {
+        let address = record.get(6).map(|s| {
             if s.is_empty() { None } else { Some(s.to_string()) }
         }).unwrap_or(None);
         
-        let size_living = record.get(8).map(|s| {
+        let size_living = record.get(7).map(|s| {
+            if s.is_empty() { None } else { Some(s.to_string()) }
+        }).unwrap_or(None);
+        
+        let description = record.get(8).map(|s| {
             if s.is_empty() { None } else { Some(s.to_string()) }
         }).unwrap_or(None);
         
@@ -130,10 +130,10 @@ pub fn save_properties_to_csv(properties: &[Property], output_path: &str) -> Res
             "Location", 
             "Type", 
             "Date", 
-            "Description",
             "Coordinates",
             "Address",
-            "Size Living"
+            "Size Living",
+            "Description"
         ])?;
     }
     

@@ -21,10 +21,10 @@ impl Property {
             self.location.clone(),
             self.property_type.clone(),
             self.date.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_default(),
-            self.description.clone().unwrap_or_default(),
             self.coordinates.map(|(lat, lng)| format!("{},{}", lat, lng)).unwrap_or_default(),
             self.address.clone().unwrap_or_default(),
             self.size_living.clone().unwrap_or_default(),
+            self.description.clone().unwrap_or_default(),
         ]
     }
 }
