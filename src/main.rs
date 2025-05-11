@@ -21,9 +21,13 @@ struct Args {
     /// Maximum number of pages to scrape
     #[clap(short, long, default_value = "1")]
     max_pages: usize,
+    
+    /// Maximum number of items to scrape (if not set, scrape all available items)
+    #[clap(short = 'i', long)]
+    max_items: Option<usize>,
 }
 
-fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<String>, cookies: Option<&str>) -> Result<Vec<Property>> {
+fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<String>, cookies: Option<&str>, max_items: Option<usize>) -> Result<Vec<Property>> {
     let mut new_properties = Vec::new();
     
     // Create a set of existing URLs for faster lookup
@@ -33,7 +37,15 @@ fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<St
         .collect();
     
     // Only scrape properties that aren't already in our database
-    for url in property_urls {
+    for (index, url) in property_urls.into_iter().enumerate() {
+        // Check if we've reached the maximum number of items
+        if let Some(max) = max_items {
+            if new_properties.len() >= max {
+                println!("Reached maximum number of items ({}), stopping", max);
+                break;
+            }
+        }
+        
         if !existing_urls.contains(&url) {
             println!("Scraping new property: {}", url);
             match scraper::scrape_property_page(&url, cookies) {
@@ -64,7 +76,12 @@ fn main() -> Result<()> {
     println!("Found {} property URLs", property_urls.len());
     
     // Only scrape new properties
-    let new_properties = scrape_new_properties(&existing_properties, property_urls, args.cookies.as_deref())?;
+    let new_properties = scrape_new_properties(
+        &existing_properties, 
+        property_urls, 
+        args.cookies.as_deref(),
+        args.max_items
+    )?;
     println!("Scraped {} new properties", new_properties.len());
     
     // Combine existing and new properties
