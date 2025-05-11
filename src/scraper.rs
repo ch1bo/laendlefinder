@@ -2,6 +2,7 @@ use crate::models::Property;
 use crate::parser;
 use anyhow::{Result, Context};
 use scraper::{Html, Selector};
+use serde_json::Value;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
@@ -22,27 +23,28 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     // Parse the HTML
     let document = Html::parse_document(&html);
     
-    // Select article links - this selector will need to be adjusted based on actual HTML structure
-    let article_selector = Selector::parse("article a.article-link").unwrap();
+    // Find the script tag containing the JSON data
+    let script_selector = Selector::parse("#topicDataNode").unwrap();
+    let script = document.select(&script_selector)
+        .next()
+        .context("Topic data script not found")?;
     
-    // Print all article elements found for debugging
-    println!("Looking for elements matching: article a.article-link");
-    let articles: Vec<_> = document.select(&article_selector).collect();
-    println!("Found {} article elements", articles.len());
+    // Parse the JSON content
+    let json_str = script.inner_html();
+    let json: Value = serde_json::from_str(&json_str)
+        .context("Failed to parse JSON data")?;
     
-    // Extract links
+    // Extract links from the hits array
     let mut links = Vec::new();
-    for element in document.select(&article_selector) {
-        if let Some(href) = element.value().attr("href") {
-            // Ensure we have absolute URLs
-            let absolute_url = if href.starts_with("http") {
-                href.to_string()
-            } else {
-                format!("https://www.vol.at{}", href)
-            };
-            links.push(absolute_url);
+    if let Some(hits) = json["prefetchedRawData"]["hits"].as_array() {
+        for hit in hits {
+            if let Some(link) = hit["link"].as_str() {
+                links.push(link.replace(r"\/", "/").to_string());
+            }
         }
     }
+    
+    println!("Found {} property links in JSON data", links.len());
     
     Ok(links)
 }
