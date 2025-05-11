@@ -16,11 +16,6 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     let html = response.text()
         .context("Failed to get response text")?;
     
-    // Dump complete HTML to file for debugging
-    std::fs::write("debug_index.html", &html)
-        .context("Failed to write debug HTML file")?;
-    println!("Dumped complete HTML to debug_index.html");
-    
     // Parse the HTML
     let document = Html::parse_document(&html);
     
@@ -78,7 +73,6 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     let response = match request.send() {
         Ok(resp) => {
             println!("Response status: {}", resp.status());
-            println!("Response headers: {:#?}", resp.headers());
             
             if !resp.status().is_success() {
                 return Err(anyhow::anyhow!("HTTP error status: {}", resp.status()));
@@ -105,59 +99,14 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         }
     };
     
-    // Save raw HTML for debugging
-    std::fs::write("debug_property_raw.html", &html)
-        .context("Failed to write raw debug property HTML file")?;
-    println!("Dumped raw property page HTML to debug_property_raw.html");
-    
     // Parse the HTML
     let document = Html::parse_document(&html);
-    
-    // Save cleaned property page HTML for debugging
-    // Filter out script tags and other trackers
-    let cleaned_html = {
-        let document = Html::parse_document(&html);
-        let _script_selector = Selector::parse("script").unwrap();
-        let _iframe_selector = Selector::parse("iframe").unwrap();
-        let _noscript_selector = Selector::parse("noscript").unwrap();
-        
-        // Get all text nodes except those inside script/iframe/noscript
-        let mut output = String::new();
-        document.root_element()
-            .descendants()
-            .filter(|n| n.value().is_text())
-            .filter(|n| {
-                let parent_is_blocked = n.parent()
-                    .and_then(|p| p.value().as_element())
-                    .map(|e| {
-                        let name = e.name();
-                        name != "script" && name != "iframe" && name != "noscript"
-                    })
-                    .unwrap_or(true);
-                parent_is_blocked
-            })
-            .for_each(|n| {
-                if let Some(text) = n.value().as_text() {
-                    output.push_str(text);
-                    output.push('\n');
-                }
-            });
-        output
-    };
-    
-    std::fs::write("debug_property.html", cleaned_html)
-        .context("Failed to write debug property HTML file")?;
-    println!("Dumped cleaned property page HTML to debug_property.html");
     
     // Try to extract data from embedded JavaScript
     let script_selector = Selector::parse("#externalPostDataNode").unwrap();
     if let Some(script) = document.select(&script_selector).next() {
         println!("Found externalPostDataNode script tag");
         let json_str = script.inner_html();
-        
-        // Save the JSON for debugging
-        std::fs::write("debug_property_json.json", &json_str)
-            .context("Failed to write debug JSON file")?;
         
         // Parse the JSON content
         let json: Value = serde_json::from_str(&json_str)
