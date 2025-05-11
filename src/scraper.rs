@@ -49,11 +49,19 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     Ok(links)
 }
 
-pub fn scrape_property_page(url: &str) -> Result<Property> {
+pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property> {
     println!("Scraping property page: {}", url);
     
+    // Build request with optional cookies
+    let mut request = reqwest::blocking::Client::new()
+        .get(url);
+    
+    if let Some(cookie_str) = cookies {
+        request = request.header("Cookie", cookie_str);
+    }
+
     // Fetch the property page
-    let response = reqwest::blocking::get(url)
+    let response = request.send()
         .context("Failed to fetch property page")?;
     let html = response.text()
         .context("Failed to get response text")?;
