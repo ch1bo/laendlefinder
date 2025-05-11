@@ -72,17 +72,17 @@ fn scrape_index_page_with_url(url: &str) -> Result<Vec<String>> {
     let json: Value = serde_json::from_str(&json_str)
         .context("Failed to parse JSON data")?;
     
-    // Extract just the first link from hits array
+    // Extract all links from hits array
     let mut links = Vec::new();
     if let Some(hits) = json["prefetchedRawData"]["hits"].as_array() {
-        if let Some(hit) = hits.first() {
+        for hit in hits {
             if let Some(link) = hit["link"].as_str() {
                 links.push(link.replace(r"\/", "/").to_string());
             }
         }
     }
     
-    println!("Taking first property link from JSON data");
+    println!("Found {} property links on page", links.len());
     
     Ok(links)
 }
