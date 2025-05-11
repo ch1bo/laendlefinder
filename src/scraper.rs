@@ -58,13 +58,34 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let html = response.text()
         .context("Failed to get response text")?;
     
-    // Save property page HTML for debugging
-    std::fs::write("debug_property.html", &html)
-        .context("Failed to write debug property HTML file")?;
-    println!("Dumped property page HTML to debug_property.html");
-    
     // Parse the HTML
     let document = Html::parse_document(&html);
+    
+    // Save cleaned property page HTML for debugging
+    // Remove script tags and other trackers
+    let cleaned_html = {
+        let script_selector = Selector::parse("script").unwrap();
+        let iframe_selector = Selector::parse("iframe").unwrap();
+        let noscript_selector = Selector::parse("noscript").unwrap();
+        let mut cleaned = document.clone();
+        
+        // Remove script, iframe and noscript elements
+        for element in cleaned.select(&script_selector).collect::<Vec<_>>() {
+            element.remove();
+        }
+        for element in cleaned.select(&iframe_selector).collect::<Vec<_>>() {
+            element.remove();
+        }
+        for element in cleaned.select(&noscript_selector).collect::<Vec<_>>() {
+            element.remove();
+        }
+        
+        cleaned.html()
+    };
+    
+    std::fs::write("debug_property.html", cleaned_html)
+        .context("Failed to write debug property HTML file")?;
+    println!("Dumped cleaned property page HTML to debug_property.html");
     
     // Select the headline - adjust selector based on actual HTML structure
     let headline_selector = Selector::parse("h1.article-headline").unwrap();
