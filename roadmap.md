@@ -9,11 +9,11 @@ A hobby project to collect historical real estate sales data and visualize it on
 *Goal: Create the simplest functional version to prove the concept works*
 
 ### Scraper (Rust)
-- [ ] Create a simple scraper for the index page (https://www.vol.at/themen/grund-und-boden)
-- [ ] Implement link extraction to find individual property listings
-- [ ] Create parser for individual property pages using heuristic approach
-- [ ] Save data to a CSV file (no database yet)
-- [ ] Handle basic error cases (page not found, network issues)
+- [x] Create a simple scraper for the index page (https://www.vol.at/themen/grund-und-boden)
+- [x] Implement link extraction to find individual property listings
+- [x] Create parser for individual property pages using heuristic approach
+- [x] Save data to a CSV file (no database yet)
+- [x] Handle basic error cases (page not found, network issues)
 
 ### Visualization
 - [ ] Create a simple HTML page with basic OpenStreetMap integration
@@ -23,9 +23,9 @@ A hobby project to collect historical real estate sales data and visualize it on
 - [ ] Manual process to update data (run scraper, copy CSV, reload page)
 
 ### Success Criteria
-- Scraper can extract data from at least one page
-- Map shows markers in correct locations
-- Basic property information is viewable
+- [x] Scraper can extract data from at least one page
+- [ ] Map shows markers in correct locations
+- [ ] Basic property information is viewable
 
 ## Gravel Road Version
 *Goal: Build a more robust solution with proper data storage and improved visualization*
@@ -128,11 +128,11 @@ A hobby project to collect historical real estate sales data and visualize it on
 - [Atlas Vorarlberg Documentation](https://atlas.vorarlberg.at)
 
 ## Initial Setup Tasks
-- [ ] Set up version control repository on GitHub (including GitHub Pages configuration)
-- [ ] Install Rust toolchain
-- [ ] Set up local development environment
-- [ ] Create basic project structure:
+- [x] Set up version control repository on GitHub (including GitHub Pages configuration)
+- [x] Install Rust toolchain
+- [x] Set up local development environment
+- [x] Create basic project structure:
   - Rust scraper component
   - Web visualization component
-- [ ] Perform initial analysis of target website structure
-- [ ] Create sample regex patterns for key data extraction
+- [x] Perform initial analysis of target website structure
+- [x] Create sample regex patterns for key data extraction
