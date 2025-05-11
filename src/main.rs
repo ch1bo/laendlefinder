@@ -1,51 +1,57 @@
-mod scraper;
-mod parser;
+use crate::models::Property;
+use anyhow::Result;
+use std::env;
+
 mod models;
+mod parser;
+mod scraper;
 mod utils;
 
-use anyhow::Result;
-use std::path::Path;
-use std::env;
-use std::fs;
-
 fn main() -> Result<()> {
-    println!("Starting LeandleFinder scraper...");
+    // Get command line arguments
+    let args: Vec<String> = env::args().collect();
     
-    // Get cookies file path from command line arguments or use default
-    let cookies_path = env::args().nth(1).unwrap_or_else(|| "cookies.txt".to_string());
-    let cookies_path = Path::new(&cookies_path);
-    
-    // Read cookies from file if it exists
-    let cookies = if cookies_path.exists() {
-        println!("Using cookies from {:?}", cookies_path);
-        Some(fs::read_to_string(cookies_path)?)
+    // Check if a URL was provided as an argument
+    let url = if args.len() > 1 {
+        &args[1]
     } else {
-        eprintln!("Warning: Cookies file not found at {:?}. Proceeding without authentication.", cookies_path);
-        None
+        // If no URL provided, scrape the index page to find property listings
+        let property_urls = scraper::scrape_index_page()?;
+        
+        if property_urls.is_empty() {
+            eprintln!("No property URLs found on the index page");
+            return Ok(());
+        }
+        
+        // Use the first property URL found
+        &property_urls[0]
     };
     
-    // Scrape the index page
-    let listings = scraper::scrape_index_page()?;
-    println!("Found {} property listings", listings.len());
+    println!("Processing property URL: {}", url);
     
-    // Process each listing
-    let mut properties = Vec::new();
-    for listing_url in listings {
-        match scraper::scrape_property_page(&listing_url, cookies.as_deref()) {
-            Ok(property) => {
-                println!("Scraped property: {} in {} for {} Euro", 
-                    property.property_type, property.location, property.price);
-                properties.push(property);
-            },
-            Err(e) => {
-                eprintln!("Error scraping {}: {}", listing_url, e);
-            }
-        }
+    // Optional cookie string can be provided as the second argument
+    let cookies = args.get(2);
+    
+    // Scrape the property page
+    let property = scraper::scrape_property_page(url, cookies.map(|s| s.as_str()))?;
+    
+    println!("Scraped property: {:?}", property);
+    
+    // Load existing properties from CSV
+    let existing_properties = utils::load_properties_from_csv("properties.csv")?;
+    
+    // Check if this property is new or different from existing ones
+    let properties = vec![property];
+    let unique_properties = utils::compare_properties(&existing_properties, &properties);
+    
+    if unique_properties.is_empty() {
+        println!("No new properties found");
+        return Ok(());
     }
     
-    // Save to CSV
-    utils::save_to_csv(&properties, "properties.csv")?;
-    println!("Saved {} properties to properties.csv", properties.len());
+    // Save the properties to CSV
+    utils::save_properties_to_csv(&properties, "properties.csv")?;
     
+    println!("Done!");
     Ok(())
 }
