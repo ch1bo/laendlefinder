@@ -1,7 +1,6 @@
 use chrono::NaiveDate;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::ser::SerializeStruct;
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Property {
@@ -68,19 +67,15 @@ impl<'de> Deserialize<'de> for Property {
         let coordinates = if helper.coordinates.is_empty() {
             None
         } else {
-            helper.coordinates.split(',')
-                .collect::<Vec<&str>>()
-                .as_slice()
-                .match_indices(|parts| {
-                    if parts.len() == 2 {
-                        let lat = parts[0].parse::<f64>().ok()?;
-                        let lng = parts[1].parse::<f64>().ok()?;
-                        Some((lat, lng))
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(None)
+            let parts: Vec<&str> = helper.coordinates.split(',').collect();
+            if parts.len() == 2 {
+                match (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
+                    (Ok(lat), Ok(lng)) => Some((lat, lng)),
+                    _ => None
+                }
+            } else {
+                None
+            }
         };
 
         Ok(Property {
