@@ -3,6 +3,7 @@ use crate::parser;
 use anyhow::{Result, Context};
 use scraper::{Html, Selector};
 use serde_json::Value;
+use chrono::NaiveDate;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
@@ -148,6 +149,27 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         .context("Failed to write debug property HTML file")?;
     println!("Dumped cleaned property page HTML to debug_property.html");
     
+    // Try to extract data from embedded JavaScript
+    let script_selector = Selector::parse("#externalPostDataNode").unwrap();
+    if let Some(script) = document.select(&script_selector).next() {
+        println!("Found externalPostDataNode script tag");
+        let json_str = script.inner_html();
+        
+        // Save the JSON for debugging
+        std::fs::write("debug_property_json.json", &json_str)
+            .context("Failed to write debug JSON file")?;
+        
+        // Parse the JSON content
+        let json: Value = serde_json::from_str(&json_str)
+            .context("Failed to parse JSON data from externalPostDataNode")?;
+        
+        // Extract property data from the JSON
+        return extract_property_from_json(json, url);
+    }
+    
+    // Fallback to traditional HTML parsing if JavaScript data not found
+    println!("JavaScript data not found, falling back to HTML parsing");
+    
     // Try different headline selectors
     let headline_selectors = [
         "h1.article-headline",
@@ -198,5 +220,84 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         property_type,
         date: None,
         description: None,
+    })
+}
+
+fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
+    println!("Extracting property data from JSON");
+    
+    // Navigate to the content section where property details are stored
+    let post = &json["content"]["data"]["post"];
+    
+    // Extract the title which contains price and location information
+    let title = post["title"].as_str()
+        .context("Title not found in JSON data")?;
+    println!("Title from JSON: {}", title);
+    
+    // Extract price, location, and property type from the title
+    let price = parser::extract_price(title)?;
+    let location = parser::extract_location(title)?;
+    let property_type = parser::extract_property_type(title)?;
+    
+    // Try to extract the transaction date from the structured data
+    let mut date = None;
+    
+    // Look for the GrundUndBoden block which contains structured data
+    if let Some(blocks) = post["blocks"].as_array() {
+        for block in blocks {
+            if block["ot"] == "russmedia/grund-und-boden" {
+                if let Some(data_str) = block["a"].as_array()
+                    .and_then(|attrs| attrs.iter().find(|attr| attr["key"] == "data"))
+                    .and_then(|attr| attr["value"].as_str()) {
+                    
+                    // Parse the data attribute which is a JSON string
+                    if let Ok(data_json) = serde_json::from_str::<Value>(data_str) {
+                        if let Some(date_str) = data_json["transactionDate"].as_str() {
+                            println!("Found transaction date: {}", date_str);
+                            // Parse the date in format YYYY-MM-DD
+                            if let Ok(parsed_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                                date = Some(parsed_date);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Try to extract description from the content
+    let mut description = None;
+    if let Some(content) = post["content"].as_str() {
+        // Extract text from HTML content
+        let fragment = Html::parse_fragment(content);
+        let text: String = fragment.root_element()
+            .descendants()
+            .filter_map(|n| {
+                if n.value().is_text() {
+                    n.value().as_text().map(|t| t.trim().to_string())
+                } else {
+                    None
+                }
+            })
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<String>>()
+            .join(" ");
+        
+        if !text.is_empty() {
+            description = Some(text);
+        }
+    }
+    
+    println!("Extracted data from JSON: price={}, location={}, type={}, date={:?}", 
+             price, location, property_type, date);
+    
+    // Create and return the Property
+    Ok(Property {
+        url: url.to_string(),
+        price,
+        location,
+        property_type,
+        date,
+        description,
     })
 }
