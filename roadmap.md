@@ -9,7 +9,6 @@ A hobby project to collect historical real estate sales data and visualize it on
 *Goal: Create the simplest functional version to prove the concept works*
 
 ### Scraper (Rust)
-- [ ] Set up basic Rust project with reqwest, scraper, and regex crates
 - [ ] Create a simple scraper for the index page (https://www.vol.at/themen/grund-und-boden)
 - [ ] Implement link extraction to find individual property listings
 - [ ] Create parser for individual property pages using heuristic approach
