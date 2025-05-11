@@ -1,58 +1,74 @@
 use anyhow::Result;
-use std::env;
+use clap::Parser;
+use crate::models::Property;
 
 mod models;
 mod parser;
 mod scraper;
 mod utils;
 
-fn main() -> Result<()> {
-    // Get command line arguments
-    let args: Vec<String> = env::args().collect();
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+struct Args {
+    /// Path to output CSV file
+    #[clap(short, long, default_value = "properties.csv")]
+    output: String,
     
-    // Check if a URL was provided as an argument or scrape the index page
-    let url_string;
-    let url = if args.len() > 1 {
-        &args[1]
-    } else {
-        // If no URL provided, scrape the index page to find property listings
-        let property_urls = scraper::scrape_index_page()?;
-        
-        if property_urls.is_empty() {
-            eprintln!("No property URLs found on the index page");
-            return Ok(());
+    /// Optional cookies for authenticated requests
+    #[clap(short, long)]
+    cookies: Option<String>,
+}
+
+fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<String>, cookies: Option<&str>) -> Result<Vec<Property>> {
+    let mut new_properties = Vec::new();
+    
+    // Create a set of existing URLs for faster lookup
+    let existing_urls: std::collections::HashSet<String> = existing_properties
+        .iter()
+        .map(|p| p.url.clone())
+        .collect();
+    
+    // Only scrape properties that aren't already in our database
+    for url in property_urls {
+        if !existing_urls.contains(&url) {
+            println!("Scraping new property: {}", url);
+            match scraper::scrape_property_page(&url, cookies) {
+                Ok(property) => {
+                    new_properties.push(property);
+                },
+                Err(e) => {
+                    eprintln!("Error scraping property {}: {}", url, e);
+                }
+            }
+        } else {
+            println!("Skipping already known property: {}", url);
         }
-        
-        // Use the first property URL found - store it in url_string to extend its lifetime
-        url_string = property_urls[0].clone();
-        &url_string
-    };
-    
-    println!("Processing property URL: {}", url);
-    
-    // Optional cookie string can be provided as the second argument
-    let cookies = args.get(2);
-    
-    // Scrape the property page
-    let property = scraper::scrape_property_page(url, cookies.map(|s| s.as_str()))?;
-    
-    println!("Scraped property: {:?}", property);
-    
-    // Load existing properties from CSV
-    let existing_properties = utils::load_properties_from_csv("properties.csv")?;
-    
-    // Check if this property is new or different from existing ones
-    let properties = vec![property];
-    let unique_properties = utils::compare_properties(&existing_properties, &properties);
-    
-    if unique_properties.is_empty() {
-        println!("No new properties found");
-        return Ok(());
     }
     
-    // Save the properties to CSV
-    utils::save_properties_to_csv(&properties, "properties.csv")?;
+    Ok(new_properties)
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
     
-    println!("Done!");
+    // Load existing properties first
+    let existing_properties = utils::load_properties_from_csv(&args.output)?;
+    println!("Loaded {} existing properties", existing_properties.len());
+    
+    // Get property URLs from index page
+    let property_urls = scraper::scrape_index_page()?;
+    println!("Found {} property URLs", property_urls.len());
+    
+    // Only scrape new properties
+    let new_properties = scrape_new_properties(&existing_properties, property_urls, args.cookies.as_deref())?;
+    println!("Scraped {} new properties", new_properties.len());
+    
+    // Combine existing and new properties
+    let mut all_properties = existing_properties.clone();
+    all_properties.extend(new_properties);
+    
+    // Save all properties to CSV
+    utils::save_properties_to_csv(&all_properties, &args.output)?;
+    
     Ok(())
 }
