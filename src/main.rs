@@ -15,7 +15,7 @@ struct Args {
     output: String,
     
     /// Optional cookies for authenticated requests
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "cookies.txt")]
     cookies: Option<String>,
     
     /// Maximum number of pages to scrape
