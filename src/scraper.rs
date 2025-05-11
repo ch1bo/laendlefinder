@@ -34,17 +34,17 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     let json: Value = serde_json::from_str(&json_str)
         .context("Failed to parse JSON data")?;
     
-    // Extract links from the hits array
+    // Extract just the first link from hits array
     let mut links = Vec::new();
     if let Some(hits) = json["prefetchedRawData"]["hits"].as_array() {
-        for hit in hits {
+        if let Some(hit) = hits.first() {
             if let Some(link) = hit["link"].as_str() {
                 links.push(link.replace(r"\/", "/").to_string());
             }
         }
     }
     
-    println!("Found {} property links in JSON data", links.len());
+    println!("Taking first property link from JSON data");
     
     Ok(links)
 }
@@ -57,6 +57,11 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         .context("Failed to fetch property page")?;
     let html = response.text()
         .context("Failed to get response text")?;
+    
+    // Save property page HTML for debugging
+    std::fs::write("debug_property.html", &html)
+        .context("Failed to write debug property HTML file")?;
+    println!("Dumped property page HTML to debug_property.html");
     
     // Parse the HTML
     let document = Html::parse_document(&html);
