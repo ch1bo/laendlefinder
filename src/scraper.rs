@@ -14,8 +14,10 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
     let html = response.text()
         .context("Failed to get response text")?;
     
-    // Print the first 500 characters of HTML for debugging
-    println!("First 500 chars of HTML: {}", &html[..500.min(html.len())]);
+    // Dump complete HTML to file for debugging
+    std::fs::write("debug_index.html", &html)
+        .context("Failed to write debug HTML file")?;
+    println!("Dumped complete HTML to debug_index.html");
     
     // Parse the HTML
     let document = Html::parse_document(&html);
