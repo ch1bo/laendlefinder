@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeandleFinder - Real Estate Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .info-container {
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+        }
+        .info-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .info-price {
+            color: #2c8a2c;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .info-date {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .info-address {
+            margin-bottom: 5px;
+        }
+        .info-description {
+            font-size: 0.9em;
+            margin-top: 10px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .loading {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="loading" class="loading">Loading property data...</div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script>
+        // Initialize the map centered on Vorarlberg, Austria
+        const map = L.map('map').setView([47.2499, 9.9809], 10);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Function to parse CSV data
+        async function loadCSVData() {
+            try {
+                const response = await fetch('../data/properties.csv');
+                const csvData = await response.text();
+                
+                Papa.parse(csvData, {
+                    header: true,
+                    complete: function(results) {
+                        displayProperties(results.data);
+                        document.getElementById('loading').style.display = 'none';
+                    },
+                    error: function(error) {
+                        console.error('Error parsing CSV:', error);
+                        document.getElementById('loading').textContent = 'Error loading data';
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching CSV:', error);
+                document.getElementById('loading').textContent = 'Error loading data';
+            }
+        }
+
+        // Function to display properties on the map
+        function displayProperties(properties) {
+            properties.forEach(property => {
+                // Skip properties without coordinates
+                if (!property.coordinates) return;
+                
+                try {
+                    // Parse coordinates (expected format: "lat,lng")
+                    const coords = property.coordinates.split(',').map(coord => parseFloat(coord.trim()));
+                    
+                    if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                        console.warn('Invalid coordinates for property:', property);
+                        return;
+                    }
+                    
+                    // Create marker
+                    const marker = L.marker([coords[0], coords[1]]).addTo(map);
+                    
+                    // Create popup content
+                    const popupContent = createPopupContent(property);
+                    marker.bindPopup(popupContent);
+                } catch (error) {
+                    console.warn('Error processing property:', property, error);
+                }
+            });
+        }
+
+        // Function to create popup content
+        function createPopupContent(property) {
+            const container = document.createElement('div');
+            container.className = 'info-container';
+            
+            // Title
+            if (property.title) {
+                const title = document.createElement('div');
+                title.className = 'info-title';
+                title.textContent = property.title;
+                container.appendChild(title);
+            }
+            
+            // Price
+            if (property.price) {
+                const price = document.createElement('div');
+                price.className = 'info-price';
+                price.textContent = property.price;
+                container.appendChild(price);
+            }
+            
+            // Date
+            if (property.date) {
+                const date = document.createElement('div');
+                date.className = 'info-date';
+                date.textContent = property.date;
+                container.appendChild(date);
+            }
+            
+            // Address
+            if (property.address) {
+                const address = document.createElement('div');
+                address.className = 'info-address';
+                address.textContent = property.address;
+                container.appendChild(address);
+            }
+            
+            // Description
+            if (property.description) {
+                const description = document.createElement('div');
+                description.className = 'info-description';
+                description.textContent = property.description;
+                container.appendChild(description);
+            }
+            
+            return container;
+        }
+
+        // Load the CSV data when the page loads
+        document.addEventListener('DOMContentLoaded', loadCSVData);
+    </script>
+</body>
+</html>
