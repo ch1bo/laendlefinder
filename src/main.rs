@@ -1,4 +1,3 @@
-use crate::models::Property;
 use anyhow::Result;
 use std::env;
 
@@ -11,7 +10,8 @@ fn main() -> Result<()> {
     // Get command line arguments
     let args: Vec<String> = env::args().collect();
     
-    // Check if a URL was provided as an argument
+    // Check if a URL was provided as an argument or scrape the index page
+    let url_string;
     let url = if args.len() > 1 {
         &args[1]
     } else {
@@ -23,8 +23,9 @@ fn main() -> Result<()> {
             return Ok(());
         }
         
-        // Use the first property URL found
-        &property_urls[0]
+        // Use the first property URL found - store it in url_string to extend its lifetime
+        url_string = property_urls[0].clone();
+        &url_string
     };
     
     println!("Processing property URL: {}", url);
