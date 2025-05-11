@@ -51,11 +51,16 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     
     // Select the headline - adjust selector based on actual HTML structure
     let headline_selector = Selector::parse("h1.article-headline").unwrap();
-    let headline = document.select(&headline_selector)
-        .next()
+    // Print all headlines found for debugging
+    let headlines: Vec<String> = document.select(&headline_selector)
+        .map(|el| el.text().collect::<String>())
+        .collect();
+    
+    println!("Found headlines: {:?}", headlines);
+    
+    let headline = headlines.first()
         .context("Headline not found")?
-        .text()
-        .collect::<String>();
+        .to_string();
     
     // Parse the headline using regex patterns
     let price = parser::extract_price(&headline)?;
