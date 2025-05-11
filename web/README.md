@@ -14,9 +14,46 @@ The web visualization displays real estate property data on an OpenStreetMap usi
 
 ## Usage
 
-1. Make sure you have run the scraper to generate the `data/properties.csv` file
-2. Open `index.html` in a web browser
-3. The map will automatically load and display property markers
+### Starting the Visualization
+
+There are several ways to view the visualization:
+
+1. **Simple method**: Open `index.html` directly in your web browser
+   - Note: Some browsers may block local file access for security reasons
+
+2. **Using a local server** (recommended):
+   - Python simple server:
+     ```
+     # Navigate to the project root directory
+     cd /path/to/leandlefinder
+     
+     # Start a simple HTTP server (Python 3)
+     python -m http.server
+     
+     # Then open http://localhost:8000/web/ in your browser
+     ```
+   
+   - Node.js with http-server:
+     ```
+     # Install http-server if you haven't already
+     npm install -g http-server
+     
+     # Navigate to the project root directory
+     cd /path/to/leandlefinder
+     
+     # Start the server
+     http-server
+     
+     # Then open http://localhost:8080/web/ in your browser
+     ```
+
+3. **Using VS Code Live Server extension**:
+   - Install the "Live Server" extension
+   - Right-click on `index.html` and select "Open with Live Server"
+
+### Prerequisites
+
+Make sure you have run the scraper to generate the `data/properties.csv` file before opening the visualization.
 
 ## Structure
 
@@ -27,6 +64,12 @@ The web visualization displays real estate property data on an OpenStreetMap usi
 - [Leaflet.js](https://leafletjs.com/): For map visualization
 - [PapaParse](https://www.papaparse.com/): For CSV parsing
 - [OpenStreetMap](https://www.openstreetmap.org/): For map tiles
+
+## Troubleshooting
+
+- **CSV file not loading**: Ensure the `data/properties.csv` file exists in the correct location relative to the web directory
+- **CORS errors**: If you see CORS-related errors in the console, you need to use a local server instead of opening the file directly
+- **Map not displaying**: Check your internet connection as the map tiles require online access
 
 ## Future Improvements
 
