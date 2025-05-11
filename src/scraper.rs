@@ -117,9 +117,9 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     // Filter out script tags and other trackers
     let cleaned_html = {
         let document = Html::parse_document(&html);
-        let script_selector = Selector::parse("script").unwrap();
-        let iframe_selector = Selector::parse("iframe").unwrap();
-        let noscript_selector = Selector::parse("noscript").unwrap();
+        let _script_selector = Selector::parse("script").unwrap();
+        let _iframe_selector = Selector::parse("iframe").unwrap();
+        let _noscript_selector = Selector::parse("noscript").unwrap();
         
         // Get all text nodes except those inside script/iframe/noscript
         let mut output = String::new();
@@ -240,7 +240,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     let property_type = parser::extract_property_type(title)?;
     
     // Try to extract the transaction date from the structured data
-    let mut date = None;
+    let mut date_string = None;
     
     // Look for the GrundUndBoden block which contains structured data
     if let Some(blocks) = post["blocks"].as_array() {
@@ -256,7 +256,8 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
                             println!("Found transaction date: {}", date_str);
                             // Parse the date in format YYYY-MM-DD
                             if let Ok(parsed_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                                date = Some(parsed_date);
+                                // Convert NaiveDate to String in the format expected by Property
+                                date_string = Some(parsed_date.format("%Y-%m-%d").to_string());
                             }
                         }
                     }
@@ -289,7 +290,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
     }
     
     println!("Extracted data from JSON: price={}, location={}, type={}, date={:?}", 
-             price, location, property_type, date);
+             price, location, property_type, date_string);
     
     // Create and return the Property
     Ok(Property {
@@ -297,7 +298,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
         price,
         location,
         property_type,
-        date,
+        date: date_string,
         description,
     })
 }
