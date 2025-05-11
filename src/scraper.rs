@@ -64,22 +64,32 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     // Save cleaned property page HTML for debugging
     // Filter out script tags and other trackers
     let cleaned_html = {
-        let fragment = Html::parse_fragment(&html);
-        let main_content = fragment.root_element();
+        let document = Html::parse_document(&html);
+        let script_selector = Selector::parse("script").unwrap();
+        let iframe_selector = Selector::parse("iframe").unwrap();
+        let noscript_selector = Selector::parse("noscript").unwrap();
         
-        // Convert to string, excluding script/iframe/noscript tags
+        // Get all text nodes except those inside script/iframe/noscript
         let mut output = String::new();
-        for node in main_content.traverse() {
-            if let scraper::Node::Element(element) = node.value() {
-                let tag_name = element.name().to_string();
-                if tag_name != "script" && tag_name != "iframe" && tag_name != "noscript" {
-                    if let Some(text) = node.text() {
-                        output.push_str(text);
-                        output.push('\n');
-                    }
+        document.root_element()
+            .descendants()
+            .filter(|n| n.value().is_text())
+            .filter(|n| {
+                let parent_is_blocked = n.parent()
+                    .and_then(|p| p.value().as_element())
+                    .map(|e| {
+                        let name = e.name();
+                        name != "script" && name != "iframe" && name != "noscript"
+                    })
+                    .unwrap_or(true);
+                parent_is_blocked
+            })
+            .for_each(|n| {
+                if let Some(text) = n.value().as_text() {
+                    output.push_str(text);
+                    output.push('\n');
                 }
-            }
-        }
+            });
         output
     };
     
