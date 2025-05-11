@@ -17,6 +17,10 @@ struct Args {
     /// Optional cookies for authenticated requests
     #[clap(short, long)]
     cookies: Option<String>,
+    
+    /// Maximum number of pages to scrape
+    #[clap(short, long, default_value = "1")]
+    max_pages: usize,
 }
 
 fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<String>, cookies: Option<&str>) -> Result<Vec<Property>> {
@@ -55,8 +59,8 @@ fn main() -> Result<()> {
     let existing_properties = utils::load_properties_from_csv(&args.output)?;
     println!("Loaded {} existing properties", existing_properties.len());
     
-    // Get property URLs from index page
-    let property_urls = scraper::scrape_index_page()?;
+    // Get property URLs from index pages up to max_pages
+    let property_urls = scraper::scrape_all_index_pages(args.max_pages)?;
     println!("Found {} property URLs", property_urls.len());
     
     // Only scrape new properties
