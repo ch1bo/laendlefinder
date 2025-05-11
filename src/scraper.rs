@@ -1,17 +1,59 @@
 use crate::models::Property;
 use crate::parser;
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 use scraper::{Html, Selector};
 use serde_json::Value;
 use chrono::NaiveDate;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
+pub fn scrape_all_index_pages(max_pages: usize) -> Result<Vec<String>> {
+    let mut all_property_urls = Vec::new();
+    let base_url = "https://www.vol.at/themen/grund-und-boden";
+    
+    println!("Scraping index page: {}", base_url);
+    
+    // Scrape the first page
+    let property_urls = scrape_index_page()?;
+    all_property_urls.extend(property_urls);
+    
+    // If max_pages is 1, we're done
+    if max_pages <= 1 {
+        return Ok(all_property_urls);
+    }
+    
+    // Otherwise, scrape additional pages up to max_pages
+    for page in 2..=max_pages {
+        let page_url = format!("{}?page={}", base_url, page);
+        println!("Scraping index page: {}", page_url);
+        
+        match scrape_index_page_with_url(&page_url) {
+            Ok(urls) => {
+                if urls.is_empty() {
+                    println!("No more properties found on page {}, stopping", page);
+                    break;
+                }
+                all_property_urls.extend(urls);
+            },
+            Err(e) => {
+                eprintln!("Error scraping page {}: {}", page, e);
+                break;
+            }
+        }
+    }
+    
+    Ok(all_property_urls)
+}
+
 pub fn scrape_index_page() -> Result<Vec<String>> {
-    println!("Scraping index page: {}", INDEX_URL);
+    scrape_index_page_with_url(INDEX_URL)
+}
+
+fn scrape_index_page_with_url(url: &str) -> Result<Vec<String>> {
+    println!("Scraping index page: {}", url);
     
     // Fetch the index page
-    let response = reqwest::blocking::get(INDEX_URL)
+    let response = reqwest::blocking::get(url)
         .context("Failed to fetch index page")?;
     let html = response.text()
         .context("Failed to get response text")?;
