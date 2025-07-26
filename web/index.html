@@ -12,10 +12,64 @@
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
         }
         #map {
             height: 100vh;
-            width: 100%;
+            width: 60%;
+        }
+        #sidebar {
+            width: 40%;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+        }
+        #property-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .property-item {
+            background-color: white;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #ddd;
+        }
+        .property-item.available {
+            border-left-color: #28a745;
+        }
+        .property-item.sold {
+            border-left-color: #dc3545;
+        }
+        .property-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+        .property-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .property-price {
+            color: #2c8a2c;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        .property-location {
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .property-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
         }
         .info-container {
             padding: 10px;
@@ -48,26 +102,16 @@
             overflow-y: auto;
         }
         .loading {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
         .filter-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
             background-color: white;
             padding: 15px;
+            margin: 10px;
             border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            max-width: 200px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .filter-title {
             font-weight: bold;
@@ -100,20 +144,23 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="loading" class="loading">Loading property data...</div>
-    
-    <div class="filter-panel">
-        <div class="filter-title">Filters</div>
-        <div class="filter-group">
-            <label>
-                <input type="checkbox" id="filter-available" checked> Available Properties
-            </label>
-            <label>
-                <input type="checkbox" id="filter-sold" checked> Sold Properties
-            </label>
+    <div id="sidebar">
+        <div class="filter-panel">
+            <div class="filter-title">Filters</div>
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="filter-available" checked> Available Properties
+                </label>
+                <label>
+                    <input type="checkbox" id="filter-sold" checked> Sold Properties
+                </label>
+            </div>
+            <div class="filter-group">
+                <button onclick="applyFilters()">Apply Filters</button>
+            </div>
         </div>
-        <div class="filter-group">
-            <button onclick="applyFilters()">Apply Filters</button>
+        <div id="property-list">
+            <div id="loading" class="loading">Loading property data...</div>
         </div>
     </div>
 
@@ -144,8 +191,9 @@
                     header: true,
                     complete: function(results) {
                         console.log(results.data);
-                        allProperties = results.data;
+                        allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
                         displayProperties(allProperties);
+                        displayPropertyList(allProperties);
                         document.getElementById('loading').style.display = 'none';
                     },
                     error: function(error) {
@@ -258,6 +306,50 @@
             return container;
         }
 
+        // Function to display properties in the list
+        function displayPropertyList(properties) {
+            const listContainer = document.getElementById('property-list');
+            listContainer.innerHTML = '';
+            
+            if (properties.length === 0) {
+                listContainer.innerHTML = '<div class="loading">No properties match the current filters</div>';
+                return;
+            }
+            
+            properties.forEach(property => {
+                const propertyDiv = document.createElement('div');
+                propertyDiv.className = `property-item ${property.listing_type}`;
+                
+                propertyDiv.innerHTML = `
+                    <div class="property-title">${property.location} - ${property.property_type}</div>
+                    <div class="property-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
+                    <div class="property-location">${property.address || property.location}</div>
+                    <div class="property-stats">
+                        <span class="info-listing-type listing-type-${property.listing_type}">
+                            ${property.listing_type.charAt(0).toUpperCase() + property.listing_type.slice(1)}
+                        </span>
+                        ${property.size_living ? `<span>${property.size_living} m²</span>` : ''}
+                        ${property.date ? `<span>${property.date}</span>` : ''}
+                    </div>
+                `;
+                
+                // Add click handler to open property URL
+                propertyDiv.addEventListener('click', () => {
+                    window.open(property.url, '_blank');
+                });
+                
+                listContainer.appendChild(propertyDiv);
+            });
+        }
+        
+        // Helper function to format price
+        function formatPrice(price) {
+            if (!price) return 'Price not available';
+            const numPrice = parseInt(price);
+            if (isNaN(numPrice)) return price;
+            return `€${numPrice.toLocaleString()}`;
+        }
+
         // Function to apply filters
         function applyFilters() {
             const showAvailable = document.getElementById('filter-available').checked;
@@ -270,6 +362,7 @@
             });
             
             displayProperties(filteredProperties);
+            displayPropertyList(filteredProperties);
         }
 
         // Load the CSV data when the page loads
