@@ -136,7 +136,8 @@ fn extract_title(document: &Html) -> Result<String> {
             .trim()
             .to_string());
     }
-    Err(anyhow::anyhow!("Title not found"))
+
+    Ok("Unknown Property".to_string())
 }
 
 fn extract_price(document: &Html) -> Result<String> {
@@ -173,7 +174,7 @@ fn extract_price(document: &Html) -> Result<String> {
         }
     }
 
-    Err(anyhow::anyhow!("Price not found"))
+    Ok("Unknown".to_string())
 }
 
 fn extract_location(document: &Html, url: &str) -> Result<String> {
