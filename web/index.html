@@ -340,7 +340,14 @@
                     Available: ${availableShown} | Sold: ${soldShown}`;
             }
             
-            properties.forEach(property => {
+            // Sort properties by date (newest first)
+            const sortedProperties = properties.slice().sort((a, b) => {
+                const dateA = a.date ? new Date(a.date) : new Date(0);
+                const dateB = b.date ? new Date(b.date) : new Date(0);
+                return dateB - dateA; // Newest first
+            });
+            
+            sortedProperties.forEach(property => {
                 const propertyDiv = document.createElement('div');
                 propertyDiv.className = `property-item ${property.listing_type}`;
                 

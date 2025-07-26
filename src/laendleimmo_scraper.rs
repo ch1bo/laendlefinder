@@ -2,6 +2,7 @@ use crate::models::{Property, ListingType};
 use anyhow::{Result, Context};
 use scraper::{Html, Selector};
 use regex::Regex;
+use chrono::NaiveDate;
 
 const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt";
 
@@ -103,9 +104,10 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let address = extract_address_from_location(&document);
     let size_living = extract_living_size(&document);
     let coordinates = extract_coordinates_from_map(&body);
+    let date = extract_date_from_html(&body);
     
-    println!("Extracted data: price={}, location={}, type={}, title={}", 
-             price, location, property_type, title);
+    println!("Extracted data: price={}, location={}, type={}, title={}, date={:?}", 
+             price, location, property_type, title, date);
     
     Ok(Property {
         url: url.to_string(),
@@ -113,7 +115,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         location,
         property_type,
         listing_type: ListingType::Available,
-        date: None, // Available properties don't have sale dates
+        date,
         coordinates,
         address,
         size_living,
@@ -375,8 +377,14 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
     let description = json["description"].as_str().unwrap_or("");
     let size_living = extract_size_from_text(description);
     
-    println!("JSON-LD extracted: price={}, location={}, type={}, name={}", 
-             price, location, property_type, name);
+    // Extract date from datePublished or dateCreated in JSON-LD
+    let date = json["datePublished"].as_str()
+        .or_else(|| json["dateCreated"].as_str())
+        .and_then(|d| parse_date_string(d))
+        .or_else(|| extract_date_from_html(body)); // Fallback to HTML parsing
+    
+    println!("JSON-LD extracted: price={}, location={}, type={}, name={}, date={:?}", 
+             price, location, property_type, name, date);
     
     Ok(Property {
         url: "".to_string(), // Will be set by caller
@@ -384,7 +392,7 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         location,
         property_type,
         listing_type: ListingType::Available,
-        date: None,
+        date,
         coordinates,
         address,
         size_living,
@@ -464,5 +472,57 @@ fn extract_size_from_text(text: &str) -> Option<String> {
             return Some(size.as_str().replace(',', "."));
         }
     }
+    None
+}
+
+fn extract_date_from_html(body: &str) -> Option<NaiveDate> {
+    // Look for adReleaseDate in dataLayer script
+    if let Some(start) = body.find("'adReleaseDate': `") {
+        let date_start = start + 18; // length of "'adReleaseDate': `"
+        if let Some(date_end) = body[date_start..].find('`') {
+            let date_str = &body[date_start..date_start + date_end];
+            return parse_date_string(date_str);
+        }
+    }
+    
+    // Look for other date patterns in dataLayer
+    let date_patterns = [
+        r#"'adReleaseDate':\s*`([^`]+)`"#,
+        r#""adReleaseDate":\s*"([^"]+)""#,
+        r#""release":\s*"([^"]+)""#,
+        r#""datePublished":\s*"([^"]+)""#,
+        r#""dateCreated":\s*"([^"]+)""#,
+        r#"release[^:]*:\s*"([^"]+)""#,
+        r#"published[^:]*:\s*"([^"]+)""#
+    ];
+    
+    for pattern in &date_patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            if let Some(captures) = regex.captures(body) {
+                if let Some(date) = captures.get(1) {
+                    return parse_date_string(date.as_str());
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+fn parse_date_string(date_str: &str) -> Option<NaiveDate> {
+    // Try common date formats
+    let formats = [
+        "%Y-%m-%d",       // 2025-07-25
+        "%d.%m.%Y",       // 25.07.2025
+        "%d/%m/%Y",       // 25/07/2025
+        "%Y/%m/%d",       // 2025/07/25
+    ];
+    
+    for format in &formats {
+        if let Ok(date) = NaiveDate::parse_from_str(date_str, format) {
+            return Some(date);
+        }
+    }
+    
     None
 }
