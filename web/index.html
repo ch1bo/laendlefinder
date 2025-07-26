@@ -118,6 +118,20 @@
             display: block;
             margin-bottom: 5px;
         }
+        .filter-count {
+            color: #666;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        .results-summary {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+            font-size: 0.9em;
+            color: #666;
+            border-left: 3px solid #007bff;
+        }
         .info-listing-type {
             color: #666;
             font-size: 0.9em;
@@ -143,15 +157,20 @@
             <div class="filter-title">Filters</div>
             <div class="filter-group">
                 <label>
-                    <input type="checkbox" id="filter-available" checked> Available Properties
+                    <input type="checkbox" id="filter-available" checked> 
+                    <span id="available-label">Available Properties</span>
+                    <span id="available-count" class="filter-count"></span>
                 </label>
                 <label>
-                    <input type="checkbox" id="filter-sold" checked> Sold Properties
+                    <input type="checkbox" id="filter-sold" checked> 
+                    <span id="sold-label">Sold Properties</span>
+                    <span id="sold-count" class="filter-count"></span>
                 </label>
             </div>
             <div class="filter-group">
                 <button onclick="applyFilters()">Apply Filters</button>
             </div>
+            <div id="results-summary" class="results-summary"></div>
         </div>
         <div id="property-list">
             <div id="loading" class="loading">Loading property data...</div>
@@ -186,6 +205,7 @@
                     complete: function(results) {
                         console.log(results.data);
                         allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
+                        updateFilterCounts();
                         displayProperties(allProperties);
                         displayPropertyList(allProperties);
                         document.getElementById('loading').style.display = 'none';
@@ -293,14 +313,31 @@
             return container;
         }
 
+        // Function to update filter counts
+        function updateFilterCounts() {
+            const availableCount = allProperties.filter(p => p.listing_type === 'available').length;
+            const soldCount = allProperties.filter(p => p.listing_type === 'sold').length;
+            
+            document.getElementById('available-count').textContent = `(${availableCount})`;
+            document.getElementById('sold-count').textContent = `(${soldCount})`;
+        }
+
         // Function to display properties in the list
         function displayPropertyList(properties) {
             const listContainer = document.getElementById('property-list');
             listContainer.innerHTML = '';
             
+            // Update results summary
+            const resultsSummary = document.getElementById('results-summary');
             if (properties.length === 0) {
                 listContainer.innerHTML = '<div class="loading">No properties match the current filters</div>';
+                resultsSummary.textContent = 'No properties match the current filters';
                 return;
+            } else {
+                const availableShown = properties.filter(p => p.listing_type === 'available').length;
+                const soldShown = properties.filter(p => p.listing_type === 'sold').length;
+                resultsSummary.innerHTML = `Showing ${properties.length} properties<br/>
+                    Available: ${availableShown} | Sold: ${soldShown}`;
             }
             
             properties.forEach(property => {
