@@ -229,7 +229,6 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>, listing_type: List
         coordinates: None,
         address: None,
         size_living: None,
-        description: None,
     })
 }
 
@@ -316,28 +315,6 @@ fn extract_property_from_json(json: Value, url: &str, listing_type: &ListingType
         }
     }
     
-    // Try to extract description from the content
-    let mut description = None;
-    if let Some(content) = post["content"].as_str() {
-        // Extract text from HTML content
-        let fragment = Html::parse_fragment(content);
-        let text: String = fragment.root_element()
-            .descendants()
-            .filter_map(|n| {
-                if n.value().is_text() {
-                    n.value().as_text().map(|t| t.trim().to_string())
-                } else {
-                    None
-                }
-            })
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<String>>()
-            .join(" ");
-        
-        if !text.is_empty() {
-            description = Some(text);
-        }
-    }
     
     println!("Extracted data from JSON: price={}, location={}, type={}, date={:?}", 
              price, location, property_type, date);
@@ -353,6 +330,5 @@ fn extract_property_from_json(json: Value, url: &str, listing_type: &ListingType
         coordinates,
         address,
         size_living,
-        description,
     })
 }

@@ -52,7 +52,6 @@ pub struct Property {
     pub coordinates: Option<(f64, f64)>,
     pub address: Option<String>,
     pub size_living: Option<String>,
-    pub description: Option<String>,
 }
 
 // Custom serialization for Property to handle the coordinates tuple
@@ -61,7 +60,7 @@ impl Serialize for Property {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Property", 10)?;
+        let mut state = serializer.serialize_struct("Property", 9)?;
         state.serialize_field("url", &self.url)?;
         state.serialize_field("price", &self.price)?;
         state.serialize_field("location", &self.location)?;
@@ -78,9 +77,6 @@ impl Serialize for Property {
         
         state.serialize_field("address", &self.address)?;
         state.serialize_field("size_living", &self.size_living)?;
-        
-        // Description moved to the last field
-        state.serialize_field("description", &self.description)?;
         
         state.end()
     }
@@ -103,7 +99,6 @@ impl<'de> Deserialize<'de> for Property {
             coordinates: String,
             address: Option<String>,
             size_living: Option<String>,
-            description: Option<String>,
         }
 
         let helper = PropertyHelper::deserialize(deserializer)?;
@@ -133,7 +128,6 @@ impl<'de> Deserialize<'de> for Property {
             coordinates,
             address: helper.address,
             size_living: helper.size_living,
-            description: helper.description,
         })
     }
 }

@@ -94,7 +94,6 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let property_type = extract_property_type(&document, url)?;
     let address = extract_address(&document);
     let size_living = extract_living_size(&document);
-    let description = extract_description(&document);
     
     // Try to extract coordinates if available
     let coordinates = extract_coordinates(&document);
@@ -112,7 +111,6 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         coordinates,
         address,
         size_living,
-        description,
     })
 }
 
@@ -275,27 +273,6 @@ fn extract_living_size(document: &Html) -> Option<String> {
     None
 }
 
-fn extract_description(document: &Html) -> Option<String> {
-    let desc_selectors = [
-        ".description",
-        ".property-description",
-        ".beschreibung",
-        "[class*='description']"
-    ];
-    
-    for selector_str in &desc_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            if let Some(element) = document.select(&selector).next() {
-                let text = element.text().collect::<Vec<_>>().join(" ").trim().to_string();
-                if !text.is_empty() {
-                    return Some(text);
-                }
-            }
-        }
-    }
-    
-    None
-}
 
 fn extract_coordinates(document: &Html) -> Option<(f64, f64)> {
     // Look for coordinates in script tags or data attributes

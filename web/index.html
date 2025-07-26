@@ -95,12 +95,6 @@
         .info-address {
             margin-bottom: 5px;
         }
-        .info-description {
-            font-size: 0.9em;
-            margin-top: 10px;
-            max-height: 100px;
-            overflow-y: auto;
-        }
         .loading {
             text-align: center;
             padding: 20px;
@@ -295,13 +289,6 @@
                 container.appendChild(address);
             }
             
-            // Description
-            if (property.description) {
-                const description = document.createElement('div');
-                description.className = 'info-description';
-                description.innerHTML = property.description;
-                container.appendChild(description);
-            }
             
             return container;
         }

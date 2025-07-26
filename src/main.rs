@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options};
+use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options, merge_properties_with_refresh};
 use laendlefinder::scrapers::{VolScraper, LaendleimmoScraper};
 use laendlefinder::utils;
 
@@ -60,17 +60,10 @@ fn main() -> Result<()> {
     // Run vol.at scraper (sold properties)
     if !args.skip_vol {
         let vol_scraper = VolScraper;
-        let new_vol_properties = run_scraper_with_options(&vol_scraper, &options)?;
-        total_new_properties += new_vol_properties.len();
+        let vol_result = run_scraper_with_options(&vol_scraper, &options)?;
+        total_new_properties += vol_result.scraped_properties.len();
         
-        // If refreshing, replace existing properties for this platform
-        if args.refresh {
-            // Remove existing vol.at properties and add refreshed ones
-            all_properties.retain(|p| !p.url.contains("vol.at"));
-            all_properties.extend(new_vol_properties);
-        } else {
-            all_properties.extend(new_vol_properties);
-        }
+        all_properties = merge_properties_with_refresh(all_properties, vol_result, "vol.at");
     } else {
         println!("Skipping vol.at scraper");
     }
@@ -78,17 +71,10 @@ fn main() -> Result<()> {
     // Run laendleimmo.at scraper (available properties)
     if !args.skip_laendleimmo {
         let laendleimmo_scraper = LaendleimmoScraper;
-        let new_laendleimmo_properties = run_scraper_with_options(&laendleimmo_scraper, &options)?;
-        total_new_properties += new_laendleimmo_properties.len();
+        let laendleimmo_result = run_scraper_with_options(&laendleimmo_scraper, &options)?;
+        total_new_properties += laendleimmo_result.scraped_properties.len();
         
-        // If refreshing, replace existing properties for this platform
-        if args.refresh {
-            // Remove existing laendleimmo.at properties and add refreshed ones
-            all_properties.retain(|p| !p.url.contains("laendleimmo.at"));
-            all_properties.extend(new_laendleimmo_properties);
-        } else {
-            all_properties.extend(new_laendleimmo_properties);
-        }
+        all_properties = merge_properties_with_refresh(all_properties, laendleimmo_result, "laendleimmo.at");
     } else {
         println!("Skipping laendleimmo.at scraper");
     }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options};
+use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options, merge_properties_with_refresh};
 use laendlefinder::scrapers::VolScraper;
 use laendlefinder::utils;
 
@@ -46,16 +46,10 @@ fn main() -> Result<()> {
     
     // Run vol.at scraper
     let vol_scraper = VolScraper;
-    let new_properties = run_scraper_with_options(&vol_scraper, &options)?;
+    let vol_result = run_scraper_with_options(&vol_scraper, &options)?;
     
-    // Handle refresh mode
-    if args.refresh {
-        // Remove existing vol.at properties and add refreshed ones
-        all_properties.retain(|p| !p.url.contains("vol.at"));
-        all_properties.extend(new_properties);
-    } else {
-        all_properties.extend(new_properties);
-    }
+    // Merge properties with proper refresh handling
+    all_properties = merge_properties_with_refresh(all_properties, vol_result, "vol.at");
     
     // Save all properties to CSV (with backup)
     utils::save_properties_to_csv(&all_properties, &args.output)?;

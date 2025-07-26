@@ -30,10 +30,16 @@ pub trait PlatformScraper {
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property>;
 }
 
+pub struct ScrapingResult {
+    pub scraped_properties: Vec<Property>,
+    pub scraped_urls: Vec<String>,
+    pub is_refresh: bool,
+}
+
 pub fn run_scraper_with_options<T: PlatformScraper>(
     scraper: &T,
     options: &ScrapingOptions,
-) -> Result<Vec<Property>> {
+) -> Result<ScrapingResult> {
     println!("{} Property Scraper", scraper.name());
     println!("{}", "=".repeat(scraper.name().len() + 17));
     
@@ -47,20 +53,31 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     
     if property_urls.is_empty() {
         println!("No properties found.");
-        return Ok(Vec::new());
+        return Ok(ScrapingResult {
+            scraped_properties: Vec::new(),
+            scraped_urls: Vec::new(),
+            is_refresh: options.refresh,
+        });
     }
     
+    // Store the URLs we're attempting to scrape
+    let scraped_urls = property_urls.clone();
+    
     // Scrape properties based on refresh mode
-    let new_properties = if options.refresh {
+    let scraped_properties = if options.refresh {
         scrape_all_properties(scraper, property_urls, options.cookies.as_deref(), options.max_items)?
     } else {
         scrape_new_properties_only(scraper, &existing_properties, property_urls, options.cookies.as_deref(), options.max_items)?
     };
     
     let action = if options.refresh { "scraped/updated" } else { "scraped" };
-    println!("{} {} new {} properties", action.char_indices().next().unwrap().1.to_uppercase().collect::<String>() + &action[1..], new_properties.len(), scraper.name().to_lowercase());
+    println!("{} {} {} {} properties", action.char_indices().next().unwrap().1.to_uppercase().collect::<String>() + &action[1..], scraped_properties.len(), scraper.name().to_lowercase(), if options.refresh { "refreshed" } else { "new" });
     
-    Ok(new_properties)
+    Ok(ScrapingResult {
+        scraped_properties,
+        scraped_urls,
+        is_refresh: options.refresh,
+    })
 }
 
 fn scrape_new_properties_only<T: PlatformScraper>(
@@ -141,4 +158,21 @@ fn scrape_all_properties<T: PlatformScraper>(
     }
     
     Ok(properties)
+}
+
+pub fn merge_properties_with_refresh(
+    mut existing_properties: Vec<Property>,
+    result: ScrapingResult,
+    _platform_domain: &str,
+) -> Vec<Property> {
+    if result.is_refresh {
+        // In refresh mode, only remove properties that were actually scraped
+        // Keep all other properties (including other platforms and non-scraped URLs from this platform)
+        existing_properties.retain(|p| !result.scraped_urls.contains(&p.url));
+        existing_properties.extend(result.scraped_properties);
+    } else {
+        // In normal mode, just add new properties
+        existing_properties.extend(result.scraped_properties);
+    }
+    existing_properties
 }
