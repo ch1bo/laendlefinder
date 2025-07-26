@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,7 +36,10 @@ impl<'de> Deserialize<'de> for ListingType {
         match s.as_str() {
             "available" => Ok(ListingType::Available),
             "sold" => Ok(ListingType::Sold),
-            _ => Err(serde::de::Error::custom(format!("Invalid listing type: {}", s))),
+            _ => Err(serde::de::Error::custom(format!(
+                "Invalid listing type: {}",
+                s
+            ))),
         }
     }
 }
@@ -67,17 +70,17 @@ impl Serialize for Property {
         state.serialize_field("property_type", &self.property_type)?;
         state.serialize_field("listing_type", &self.listing_type)?;
         state.serialize_field("date", &self.date)?;
-        
+
         // Serialize coordinates as a single string field
         let coords_str = match &self.coordinates {
             Some((lat, lng)) => format!("{},{}", lat, lng),
             None => String::new(),
         };
         state.serialize_field("coordinates", &coords_str)?;
-        
+
         state.serialize_field("address", &self.address)?;
         state.serialize_field("size_living", &self.size_living)?;
-        
+
         state.end()
     }
 }
@@ -102,7 +105,7 @@ impl<'de> Deserialize<'de> for Property {
         }
 
         let helper = PropertyHelper::deserialize(deserializer)?;
-        
+
         // Parse coordinates from string
         let coordinates = if helper.coordinates.is_empty() {
             None
@@ -111,7 +114,7 @@ impl<'de> Deserialize<'de> for Property {
             if parts.len() == 2 {
                 match (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
                     (Ok(lat), Ok(lng)) => Some((lat, lng)),
-                    _ => None
+                    _ => None,
                 }
             } else {
                 None
