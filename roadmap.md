@@ -16,16 +16,16 @@ A hobby project to collect historical real estate sales data and visualize it on
 - [x] Handle basic error cases (page not found, network issues)
 
 ### Visualization
-- [ ] Create a simple HTML page with basic OpenStreetMap integration
-- [ ] Implement basic JavaScript to read data from the CSV
-- [ ] Display simple markers for each property
-- [ ] Show basic info (price, date) on click
-- [ ] Manual process to update data (run scraper, copy CSV, reload page)
+- [x] Create a simple HTML page with basic OpenStreetMap integration
+- [x] Implement basic JavaScript to read data from the CSV
+- [x] Display simple markers for each property
+- [x] Show basic info (price, date) on click
+- [x] Manual process to update data (run scraper, copy CSV, reload page)
 
 ### Success Criteria
 - [x] Scraper can extract data from at least one page
-- [ ] Map shows markers in correct locations
-- [ ] Basic property information is viewable
+- [x] Map shows markers in correct locations
+- [x] Basic property information is viewable
 
 ## Gravel Road Version
 *Goal: Build a more robust solution with proper data storage and improved visualization*
