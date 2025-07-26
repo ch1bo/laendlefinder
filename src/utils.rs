@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use chrono::Utc;
 use std::fs::{copy, File};
 use std::path::Path;
 // Removed the unused import: use csv::Writer;
@@ -56,10 +55,9 @@ pub fn save_properties_to_csv(properties: &[Property], path: &str) -> Result<()>
 
     // Create backup if file exists
     if path_obj.exists() {
-        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-        let backup_path = format!("{}.backup.{}", path, timestamp);
+        let backup_path = "properties_backup.csv";
 
-        copy(path, &backup_path)
+        copy(path, backup_path)
             .with_context(|| format!("Failed to create backup: {}", backup_path))?;
 
         println!("Created backup: {}", backup_path);
