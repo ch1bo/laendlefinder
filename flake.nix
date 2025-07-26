@@ -13,6 +13,9 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
+            "claude-code"
+          ];
         };
 
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
@@ -22,6 +25,7 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            claude-code
             rustToolchain
             pkg-config
             openssl
