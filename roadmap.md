@@ -31,11 +31,11 @@ A hobby project to collect historical real estate sales data and visualize it on
 *Goal: Build a more robust solution with proper data storage and improved visualization*
 
 ### Scraper Improvements
-- [ ] Add SQLite database integration with rusqlite
-- [ ] Design proper schema for property data
+- [ ] Implement multi-page scraping for available properties
+- [ ] Implement multi-page scraping for sold properties
+- [ ] Navigate through pagination to extract comprehensive historical data
 - [ ] Improve regex patterns to extract additional data fields from article content
 - [ ] Handle edge cases in the content structure
-- [ ] Extract historical data by navigating through pagination
 - [ ] Add data normalization and cleaning
 - [ ] Implement geocoding to get coordinates from addresses
 - [ ] Add proper rate limiting and request handling
@@ -50,7 +50,7 @@ A hobby project to collect historical real estate sales data and visualize it on
   - Simple property attribute filters
 - [ ] Implement property clusters for better map readability
 - [ ] Add color coding for price ranges
-- [ ] Create a simple backend API to query the SQLite database
+- [ ] Improve CSV data structure to support multiple property types and status
 - [ ] Add basic statistics (avg price, count by area)
 - [ ] Implement responsive design for mobile viewing
 - [ ] Add cadastral data overlay from Atlas Vorarlberg:
@@ -61,8 +61,8 @@ A hobby project to collect historical real estate sales data and visualize it on
   - Add layer opacity controls
 
 ### Success Criteria
-- Scraper reliably collects data from multiple pages
-- Database properly stores and indexes data
+- Scraper reliably collects data from multiple pages of both available and sold properties
+- CSV data structure properly handles different property types and status
 - Map visualization has useful filtering options
 - Basic analytics provide insight into the data
 
@@ -110,8 +110,8 @@ A hobby project to collect historical real estate sales data and visualize it on
 - Data collection is reliable and automated
 
 ## Tech Stack
-- **Scraper**: Rust with reqwest, scraper, regex, and rusqlite
-- **Database**: SQLite
+- **Scraper**: Rust with reqwest, scraper, and regex
+- **Data Storage**: CSV format (SQLite planned for Highway version)
 - **Visualization**: HTML/CSS/JavaScript with Leaflet.js for OpenStreetMap
 - **Hosting**: GitHub Pages for the visualization component
 - **Map Services**: OpenStreetMap base layer, WMS integration for Vorarlberg cadastral data
@@ -120,7 +120,6 @@ A hobby project to collect historical real estate sales data and visualize it on
 - [Rust Book](https://doc.rust-lang.org/book/)
 - [Reqwest Documentation](https://docs.rs/reqwest)
 - [Scraper Crate Documentation](https://docs.rs/scraper)
-- [Rusqlite Documentation](https://docs.rs/rusqlite)
 - [Leaflet.js Documentation](https://leafletjs.com/reference.html)
 - [OpenStreetMap Wiki](https://wiki.openstreetmap.org/wiki/Main_Page)
 - [Leaflet.WMS Plugin](https://github.com/heigeo/leaflet.wms)
