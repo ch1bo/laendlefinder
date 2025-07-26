@@ -48,7 +48,7 @@ fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<St
         
         if !existing_urls.contains(&url) {
             println!("Scraping new property: {}", url);
-            match scraper::scrape_property_page(&url, cookies, ListingType::Available) {
+            match scraper::scrape_property_page(&url, cookies, ListingType::Sold) {
                 Ok(property) => {
                     new_properties.push(property);
                 },
