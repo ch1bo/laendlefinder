@@ -7,7 +7,9 @@ A hobby project to collect historical real estate sales data from Vorarlberg and
 1. **Data Scraper**: Collects and stores real estate sales data (Rust)
 2. **Map Visualization**: Displays the data on OpenStreetMap (JavaScript)
 
-## Scraper Usage
+## Usage
+
+### Running the Scraper
 
 ``` shell
 cargo run
@@ -26,6 +28,16 @@ Some websites require authentication to access their content. You can provide co
 7. Copy the entire cookie string
 8. Save it to a file named `cookies.txt` in the project root directory
 9. Run the scraper with: `cargo run cookies.txt` (or specify a different path)
+
+### Running the Web Visualization
+
+After running the scraper, or if you have a `properties.csv` file:
+
+``` shell
+simple-http-server web -i -o
+```
+
+This will start a local server and automatically open the visualization in your browser. The map displays property markers on OpenStreetMap with clickable popups showing property details.
 
 ## Project Status
 
