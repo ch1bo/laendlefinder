@@ -11,8 +11,32 @@ A hobby project to collect historical real estate sales data from Vorarlberg and
 
 ### Running the Scraper
 
+The unified `laendlefinder` executable runs both scrapers sequentially:
+
+**Run all scrapers:**
 ``` shell
 cargo run
+```
+
+**Run with custom options:**
+``` shell
+cargo run -- --max-pages 3 --output my_properties.csv
+```
+
+**Run only vol.at scraper (sold properties):**
+``` shell
+cargo run -- --skip-laendleimmo
+```
+
+**Run only laendleimmo.at scraper (available properties):**
+``` shell
+cargo run -- --skip-vol
+```
+
+**Individual scrapers (backwards compatibility):**
+``` shell
+cargo run --bin vol-scraper
+cargo run --bin laendleimmo-scraper
 ```
 
 ### Using Authentication with Cookies
