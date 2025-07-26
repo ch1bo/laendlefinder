@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use crate::models::Property;
+use crate::models::{Property, ListingType};
 
 mod models;
 mod parser;
@@ -48,7 +48,7 @@ fn scrape_new_properties(existing_properties: &[Property], property_urls: Vec<St
         
         if !existing_urls.contains(&url) {
             println!("Scraping new property: {}", url);
-            match scraper::scrape_property_page(&url, cookies) {
+            match scraper::scrape_property_page(&url, cookies, ListingType::Available) {
                 Ok(property) => {
                     new_properties.push(property);
                 },

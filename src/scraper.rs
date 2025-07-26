@@ -1,4 +1,4 @@
-use crate::models::Property;
+use crate::models::{Property, ListingType};
 use crate::parser;
 use anyhow::{Result, Context};
 use scraper::{Html, Selector};
@@ -87,7 +87,7 @@ fn scrape_index_page_with_url(url: &str) -> Result<Vec<String>> {
     Ok(links)
 }
 
-pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property> {
+pub fn scrape_property_page(url: &str, cookies: Option<&str>, listing_type: ListingType) -> Result<Property> {
     println!("Scraping property page: {}", url);
     
     // Build request with optional cookies
@@ -155,7 +155,7 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
             .context("Failed to parse JSON data from externalPostDataNode")?;
         
         // Extract property data from the JSON
-        return extract_property_from_json(json, url);
+        return extract_property_from_json(json, url, &listing_type);
     }
     
     // Fallback to traditional HTML parsing if JavaScript data not found
@@ -224,6 +224,7 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
         price: price.to_string(),
         location,
         property_type,
+        listing_type: listing_type.clone(),
         date: None,
         coordinates: None,
         address: None,
@@ -232,7 +233,7 @@ pub fn scrape_property_page(url: &str, cookies: Option<&str>) -> Result<Property
     })
 }
 
-fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
+fn extract_property_from_json(json: Value, url: &str, listing_type: &ListingType) -> Result<Property> {
     println!("Extracting property data from JSON");
     
     // Navigate to the content section where property details are stored
@@ -347,6 +348,7 @@ fn extract_property_from_json(json: Value, url: &str) -> Result<Property> {
         price: price.to_string(),
         location,
         property_type,
+        listing_type: listing_type.clone(),
         date,
         coordinates,
         address,

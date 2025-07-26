@@ -58,11 +58,64 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             z-index: 1000;
         }
+        .filter-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            max-width: 200px;
+        }
+        .filter-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .filter-group {
+            margin-bottom: 10px;
+        }
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .info-listing-type {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .listing-type-available {
+            background-color: #e8f5e8;
+            color: #2c5f2c;
+        }
+        .listing-type-sold {
+            background-color: #f5e8e8;
+            color: #5f2c2c;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div id="loading" class="loading">Loading property data...</div>
+    
+    <div class="filter-panel">
+        <div class="filter-title">Filters</div>
+        <div class="filter-group">
+            <label>
+                <input type="checkbox" id="filter-available" checked> Available Properties
+            </label>
+            <label>
+                <input type="checkbox" id="filter-sold" checked> Sold Properties
+            </label>
+        </div>
+        <div class="filter-group">
+            <button onclick="applyFilters()">Apply Filters</button>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -77,6 +130,10 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        // Global variables for filtering
+        let allProperties = [];
+        let markers = [];
+
         // Function to parse CSV data
         async function loadCSVData() {
             try {
@@ -87,7 +144,8 @@
                     header: true,
                     complete: function(results) {
                         console.log(results.data);
-                        displayProperties(results.data);
+                        allProperties = results.data;
+                        displayProperties(allProperties);
                         document.getElementById('loading').style.display = 'none';
                     },
                     error: function(error) {
@@ -103,6 +161,10 @@
 
         // Function to display properties on the map
         function displayProperties(properties) {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
             properties.forEach(property => {
                 // Skip properties without coordinates
                 if (!property.coordinates) return;
@@ -116,8 +178,21 @@
                         return;
                     }
                     
-                    // Create marker
-                    const marker = L.marker([coords[0], coords[1]]).addTo(map);
+                    // Choose marker color based on listing type
+                    const markerColor = property.listing_type === 'sold' ? 'red' : 'green';
+                    
+                    // Create marker with custom icon
+                    const marker = L.marker([coords[0], coords[1]], {
+                        icon: L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div style="background-color: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8]
+                        })
+                    }).addTo(map);
+                    
+                    // Store marker for filtering
+                    markers.push(marker);
                     
                     // Create popup content
                     const popupContent = createPopupContent(property);
@@ -139,6 +214,14 @@
             title.href = property.url;
             title.textContent = property.url;
             container.appendChild(title);
+            
+            // Listing Type
+            if (property.listing_type) {
+                const listingType = document.createElement('div');
+                listingType.className = `info-listing-type listing-type-${property.listing_type}`;
+                listingType.textContent = property.listing_type.charAt(0).toUpperCase() + property.listing_type.slice(1);
+                container.appendChild(listingType);
+            }
             
             // Price
             if (property.price) {
@@ -173,6 +256,20 @@
             }
             
             return container;
+        }
+
+        // Function to apply filters
+        function applyFilters() {
+            const showAvailable = document.getElementById('filter-available').checked;
+            const showSold = document.getElementById('filter-sold').checked;
+            
+            const filteredProperties = allProperties.filter(property => {
+                if (property.listing_type === 'available' && !showAvailable) return false;
+                if (property.listing_type === 'sold' && !showSold) return false;
+                return true;
+            });
+            
+            displayProperties(filteredProperties);
         }
 
         // Load the CSV data when the page loads
