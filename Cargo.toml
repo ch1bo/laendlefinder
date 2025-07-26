@@ -3,6 +3,14 @@ name = "laendlefinder"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "vol-scraper"
+path = "src/bin/vol_scraper.rs"
+
+[[bin]]
+name = "laendleimmo-scraper"
+path = "src/bin/laendleimmo_scraper.rs"
+
 [dependencies]
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
