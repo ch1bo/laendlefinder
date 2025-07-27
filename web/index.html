@@ -284,16 +284,25 @@
                         allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
                         updateFilterCounts();
                         applyFilters(); // Use applyFilters instead of direct calls
-                        document.getElementById('loading').style.display = 'none';
+                        const loadingElement = document.getElementById('loading');
+                        if (loadingElement) {
+                            loadingElement.style.display = 'none';
+                        }
                     },
                     error: function(error) {
                         console.error('Error parsing CSV:', error);
-                        document.getElementById('loading').textContent = 'Error loading data';
+                        const loadingElement = document.getElementById('loading');
+                        if (loadingElement) {
+                            loadingElement.textContent = 'Error loading data';
+                        }
                     }
                 });
             } catch (error) {
                 console.error('Error fetching CSV:', error);
-                document.getElementById('loading').textContent = 'Error loading data';
+                const loadingElement = document.getElementById('loading');
+                if (loadingElement) {
+                    loadingElement.textContent = 'Error loading data';
+                }
             }
         }
 
@@ -595,7 +604,10 @@
         function highlightMarker(property) {
             // Clear previous marker highlighting
             if (currentHighlightedMarker) {
-                currentHighlightedMarker.getElement().classList.remove('marker-highlighted');
+                const previousElement = currentHighlightedMarker.getElement();
+                if (previousElement) {
+                    previousElement.classList.remove('marker-highlighted');
+                }
             }
             
             // Find the marker with matching property data
@@ -606,8 +618,8 @@
                 const markerElement = marker.getElement();
                 if (markerElement) {
                     markerElement.classList.add('marker-highlighted');
+                    currentHighlightedMarker = marker;
                 }
-                currentHighlightedMarker = marker;
                 
                 // Center map on the marker (only when called from list click)
                 if (marker !== currentHighlightedMarker || !document.querySelector('.property-item.highlighted')) {
@@ -629,7 +641,10 @@
             
             // Clear marker highlighting
             if (currentHighlightedMarker) {
-                currentHighlightedMarker.getElement().classList.remove('marker-highlighted');
+                const markerElement = currentHighlightedMarker.getElement();
+                if (markerElement) {
+                    markerElement.classList.remove('marker-highlighted');
+                }
                 currentHighlightedMarker = null;
             }
         }
