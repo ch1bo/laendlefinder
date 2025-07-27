@@ -23,6 +23,8 @@
         };
       in
       {
+        packages.default = ./web;
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             claude-code
