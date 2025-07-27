@@ -49,6 +49,11 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             cursor: pointer;
         }
+        .property-item.highlighted {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+        }
         .property-title {
             font-weight: bold;
             margin-bottom: 5px;
@@ -148,6 +153,32 @@
             background-color: #f5e8e8;
             color: #5f2c2c;
         }
+        .visit-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .visit-button:hover {
+            background-color: #0056b3;
+            color: white;
+            text-decoration: none;
+        }
+        .marker-highlighted div {
+            background-color: #ffc107 !important;
+            border-color: #ff6b35 !important;
+            border-width: 3px !important;
+            transform: scale(1.3) !important;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.8) !important;
+            z-index: 1000 !important;
+        }
     </style>
 </head>
 <body>
@@ -193,6 +224,9 @@
         // Global variables for filtering
         let allProperties = [];
         let markers = [];
+        let propertyElements = [];
+        let currentHighlightedMarker = null;
+        let currentHighlightedProperty = null;
 
         // Function to parse CSV data
         async function loadCSVData() {
@@ -227,7 +261,7 @@
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
             
-            properties.forEach(property => {
+            properties.forEach((property, index) => {
                 // Skip properties without coordinates
                 if (!property.coordinates) return;
                 
@@ -253,12 +287,17 @@
                         })
                     }).addTo(map);
                     
+                    // Store property reference with marker
+                    marker.propertyData = property;
+                    
+                    // Add click handler for marker highlighting
+                    marker.on('click', function() {
+                        highlightProperty(property);
+                        highlightMarker(property);
+                    });
+                    
                     // Store marker for filtering
                     markers.push(marker);
-                    
-                    // Create popup content
-                    const popupContent = createPopupContent(property);
-                    marker.bindPopup(popupContent);
                 } catch (error) {
                     console.warn('Error processing property:', property, error);
                 }
@@ -271,11 +310,9 @@
             container.className = 'info-container';
             
             // Title
-            const title = document.createElement('a');
+            const title = document.createElement('div');
             title.className = 'info-title';
-            title.href = property.url;
-            title.textContent = property.url;
-            title.target = "blank";
+            title.textContent = `${property.location} - ${property.property_type}`;
             container.appendChild(title);
             
             // Listing Type
@@ -310,6 +347,15 @@
                 container.appendChild(address);
             }
             
+            // Visit button
+            const visitButton = document.createElement('button');
+            visitButton.className = 'visit-button';
+            visitButton.textContent = 'Visit Property Page';
+            visitButton.onclick = function(e) {
+                e.stopPropagation();
+                window.open(property.url, '_blank');
+            };
+            container.appendChild(visitButton);
             
             return container;
         }
@@ -327,6 +373,7 @@
         function displayPropertyList(properties) {
             const listContainer = document.getElementById('property-list');
             listContainer.innerHTML = '';
+            propertyElements = []; // Clear previous property elements
             
             // Update results summary
             const resultsSummary = document.getElementById('results-summary');
@@ -351,6 +398,7 @@
             sortedProperties.forEach(property => {
                 const propertyDiv = document.createElement('div');
                 propertyDiv.className = `property-item ${property.listing_type}`;
+                propertyDiv.propertyData = property; // Store property reference
                 
                 propertyDiv.innerHTML = `
                     <div class="property-title">${property.location} - ${property.property_type}</div>
@@ -363,13 +411,18 @@
                         ${property.size_living ? `<span>${property.size_living} m²</span>` : ''}
                         ${property.date ? `<span>${property.date}</span>` : ''}
                     </div>
+                    <a href="${property.url}" target="_blank" class="visit-button" onclick="event.stopPropagation();">
+                        Visit Property Page
+                    </a>
                 `;
                 
-                // Add click handler to open property URL
-                propertyDiv.addEventListener('click', () => {
-                    window.open(property.url, '_blank');
+                // Add click handler for highlighting
+                propertyDiv.addEventListener('click', (e) => {
+                    highlightProperty(property);
+                    highlightMarker(property);
                 });
                 
+                propertyElements.push(propertyDiv);
                 listContainer.appendChild(propertyDiv);
             });
         }
@@ -396,6 +449,79 @@
             displayProperties(filteredProperties);
             displayPropertyList(filteredProperties);
         }
+
+        // Function to highlight a property in the list when its marker is clicked
+        function highlightProperty(property) {
+            // Clear previous property highlighting
+            if (currentHighlightedProperty) {
+                currentHighlightedProperty.classList.remove('highlighted');
+            }
+            
+            // Find the property element with matching data
+            const propertyElement = propertyElements.find(el => el.propertyData && el.propertyData.url === property.url);
+            if (propertyElement) {
+                propertyElement.classList.add('highlighted');
+                currentHighlightedProperty = propertyElement;
+                
+                // Scroll the highlighted property into view
+                propertyElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+            } else {
+                console.log('Property element not found for:', property.url);
+            }
+        }
+
+        // Function to highlight a marker when its property list item is clicked
+        function highlightMarker(property) {
+            // Clear previous marker highlighting
+            if (currentHighlightedMarker) {
+                currentHighlightedMarker.getElement().classList.remove('marker-highlighted');
+            }
+            
+            // Find the marker with matching property data
+            const marker = markers.find(m => m.propertyData && m.propertyData.url === property.url);
+            
+            if (marker) {
+                // Add highlighting class to the marker element
+                const markerElement = marker.getElement();
+                if (markerElement) {
+                    markerElement.classList.add('marker-highlighted');
+                }
+                currentHighlightedMarker = marker;
+                
+                // Center map on the marker (only when called from list click)
+                if (marker !== currentHighlightedMarker || !document.querySelector('.property-item.highlighted')) {
+                    map.setView(marker.getLatLng(), Math.max(map.getZoom(), 15), {
+                        animate: true,
+                        duration: 0.5
+                    });
+                }
+            }
+        }
+
+        // Function to clear all highlights
+        function clearHighlights() {
+            // Clear property highlighting
+            if (currentHighlightedProperty) {
+                currentHighlightedProperty.classList.remove('highlighted');
+                currentHighlightedProperty = null;
+            }
+            
+            // Clear marker highlighting
+            if (currentHighlightedMarker) {
+                currentHighlightedMarker.getElement().classList.remove('marker-highlighted');
+                currentHighlightedMarker = null;
+            }
+        }
+
+        // Add ESC key listener to clear highlights
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                clearHighlights();
+            }
+        });
 
         // Load the CSV data when the page loads
         document.addEventListener('DOMContentLoaded', loadCSVData);
