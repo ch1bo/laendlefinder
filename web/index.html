@@ -25,6 +25,23 @@
             border-left: 1px solid #dee2e6;
             display: flex;
             flex-direction: column;
+            position: relative;
+        }
+        .reset-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            z-index: 10;
+        }
+        .reset-button:hover {
+            background-color: #5a6268;
         }
         #property-list {
             flex: 1;
@@ -128,14 +145,15 @@
             font-weight: normal;
             margin-left: 5px;
         }
-        .results-summary {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 3px;
-            font-size: 0.9em;
-            color: #666;
-            border-left: 3px solid #007bff;
+        .live-count {
+            padding: 8px 15px;
+            margin: 10px 0;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #495057;
+            text-align: center;
+            border: 1px solid #dee2e6;
         }
         .info-listing-type {
             color: #666;
@@ -184,6 +202,7 @@
 <body>
     <div id="map"></div>
     <div id="sidebar">
+        <button class="reset-button" onclick="resetView()">Reset View</button>
         <div class="filter-panel">
             <div class="filter-title">Filters</div>
             <div class="filter-group">
@@ -201,7 +220,6 @@
             <div class="filter-group">
                 <button onclick="applyFilters()">Apply Filters</button>
             </div>
-            <div id="results-summary" class="results-summary"></div>
         </div>
         <div id="property-list">
             <div id="loading" class="loading">Loading property data...</div>
@@ -227,6 +245,8 @@
         let propertyElements = [];
         let currentHighlightedMarker = null;
         let currentHighlightedProperty = null;
+        let filteredProperties = [];
+        let showOnlyVisible = false;
 
         // Function to parse CSV data
         async function loadCSVData() {
@@ -240,8 +260,7 @@
                         console.log(results.data);
                         allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
                         updateFilterCounts();
-                        displayProperties(allProperties);
-                        displayPropertyList(allProperties);
+                        applyFilters(); // Use applyFilters instead of direct calls
                         document.getElementById('loading').style.display = 'none';
                     },
                     error: function(error) {
@@ -375,18 +394,17 @@
             listContainer.innerHTML = '';
             propertyElements = []; // Clear previous property elements
             
-            // Update results summary
-            const resultsSummary = document.getElementById('results-summary');
+            // Handle empty results
             if (properties.length === 0) {
                 listContainer.innerHTML = '<div class="loading">No properties match the current filters</div>';
-                resultsSummary.textContent = 'No properties match the current filters';
                 return;
-            } else {
-                const availableShown = properties.filter(p => p.listing_type === 'available').length;
-                const soldShown = properties.filter(p => p.listing_type === 'sold').length;
-                resultsSummary.innerHTML = `Showing ${properties.length} properties<br/>
-                    Available: ${availableShown} | Sold: ${soldShown}`;
             }
+            
+            // Add live count at the top
+            const liveCount = document.createElement('div');
+            liveCount.className = 'live-count';
+            liveCount.textContent = `${properties.length} properties in current view`;
+            listContainer.appendChild(liveCount);
             
             // Sort properties by date (newest first)
             const sortedProperties = properties.slice().sort((a, b) => {
@@ -440,14 +458,41 @@
             const showAvailable = document.getElementById('filter-available').checked;
             const showSold = document.getElementById('filter-sold').checked;
             
-            const filteredProperties = allProperties.filter(property => {
+            filteredProperties = allProperties.filter(property => {
                 if (property.listing_type === 'available' && !showAvailable) return false;
                 if (property.listing_type === 'sold' && !showSold) return false;
                 return true;
             });
             
             displayProperties(filteredProperties);
-            displayPropertyList(filteredProperties);
+            
+            // Filter list based on visibility
+            if (showOnlyVisible) {
+                filterListByVisibleMarkers();
+            } else {
+                displayPropertyList(filteredProperties);
+            }
+        }
+        
+        // Function to filter list to only show properties with visible markers
+        function filterListByVisibleMarkers() {
+            const bounds = map.getBounds();
+            const visibleProperties = filteredProperties.filter(property => {
+                if (!property.coordinates) return false;
+                const coords = property.coordinates.split(',').map(coord => parseFloat(coord.trim()));
+                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) return false;
+                return bounds.contains([coords[0], coords[1]]);
+            });
+            
+            displayPropertyList(visibleProperties);
+        }
+        
+        // Function to reset view and show all properties
+        function resetView() {
+            showOnlyVisible = false;
+            clearHighlights();
+            map.setView([47.2499, 9.9809], 10); // Reset to initial Vorarlberg view
+            applyFilters(); // Refresh the display
         }
 
         // Function to highlight a property in the list when its marker is clicked
@@ -520,6 +565,20 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 clearHighlights();
+            }
+        });
+
+        // Add map event listeners for automatic visible filtering
+        map.on('moveend zoomend', function() {
+            if (showOnlyVisible) {
+                filterListByVisibleMarkers();
+            }
+        });
+
+        // Enable visible filtering when user interacts with map
+        map.on('dragstart zoomstart', function() {
+            if (!showOnlyVisible) {
+                showOnlyVisible = true;
             }
         });
 
