@@ -30,123 +30,72 @@ pub trait PlatformScraper {
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property>;
 }
 
-pub struct ScrapingResult {
-    pub scraped_properties: Vec<Property>,
-    pub scraped_urls: Vec<String>,
-    pub is_refresh: bool,
-}
-
+/// Main scraping function that implements the new algorithm:
+/// 1. Load all existing URLs
+/// 2. Find listings according to parameters  
+/// 3. Skip if already known or refresh when option is set
+/// 4. Finally backup properties.csv and write a new CSV with all known properties (deduplicated by URL)
 pub fn run_scraper_with_options<T: PlatformScraper>(
     scraper: &T,
     options: &ScrapingOptions,
-) -> Result<ScrapingResult> {
+) -> Result<()> {
     println!("{} Property Scraper", scraper.name());
     println!("{}", "=".repeat(scraper.name().len() + 17));
     
-    // Load existing properties first
-    let existing_properties = utils::load_properties_from_csv(&options.output_file)?;
-    println!("Loaded {} existing properties", existing_properties.len());
+    // 1. Load all existing properties
+    let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
+    println!("Loaded {} existing properties", all_properties.len());
     
-    // Get property URLs from listing pages up to max_pages
-    let property_urls = scraper.scrape_listings(options.max_pages)?;
-    println!("Found {} property URLs", property_urls.len());
-    
-    if property_urls.is_empty() {
-        println!("No properties found.");
-        return Ok(ScrapingResult {
-            scraped_properties: Vec::new(),
-            scraped_urls: Vec::new(),
-            is_refresh: options.refresh,
-        });
-    }
-    
-    // Store the URLs we're attempting to scrape
-    let scraped_urls = property_urls.clone();
-    
-    // Scrape properties based on refresh mode
-    let scraped_properties = if options.refresh {
-        scrape_all_properties(scraper, property_urls, options.cookies.as_deref(), options.max_items)?
-    } else {
-        scrape_new_properties_only(scraper, &existing_properties, property_urls, options.cookies.as_deref(), options.max_items)?
-    };
-    
-    let action = if options.refresh { "scraped/updated" } else { "scraped" };
-    println!("{} {} {} {} properties", action.char_indices().next().unwrap().1.to_uppercase().collect::<String>() + &action[1..], scraped_properties.len(), scraper.name().to_lowercase(), if options.refresh { "refreshed" } else { "new" });
-    
-    Ok(ScrapingResult {
-        scraped_properties,
-        scraped_urls,
-        is_refresh: options.refresh,
-    })
-}
-
-fn scrape_new_properties_only<T: PlatformScraper>(
-    scraper: &T,
-    existing_properties: &[Property],
-    property_urls: Vec<String>,
-    cookies: Option<&str>,
-    max_items: Option<usize>,
-) -> Result<Vec<Property>> {
-    let mut new_properties = Vec::new();
-    
-    // Create a set of existing URLs for faster lookup
-    let existing_urls: HashSet<String> = existing_properties
+    // Create a set of existing URLs for fast lookup
+    let existing_urls: HashSet<String> = all_properties
         .iter()
         .map(|p| p.url.clone())
         .collect();
     
-    // Only scrape properties that aren't already in our database
-    for url in property_urls {
-        // Check if we've reached the maximum number of items
-        if let Some(max) = max_items {
-            if new_properties.len() >= max {
-                println!("Reached maximum number of items ({}), stopping", max);
-                break;
-            }
-        }
-        
-        if !existing_urls.contains(&url) {
-            println!("Scraping new property: {}", url);
-            match scraper.scrape_property(&url, cookies) {
-                Ok(property) => {
-                    new_properties.push(property);
-                },
-                Err(e) => {
-                    eprintln!("Error scraping property {}: {}", url, e);
-                }
-            }
-            
-            // Add a small delay to be respectful to the server
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        } else {
-            println!("Skipping already known property: {}", url);
-        }
+    // 2. Find listings according to parameters
+    let found_urls = scraper.scrape_listings(options.max_pages)?;
+    println!("Found {} property URLs from listings", found_urls.len());
+    
+    if found_urls.is_empty() {
+        println!("No properties found in listings.");
+        return Ok(());
     }
     
-    Ok(new_properties)
-}
-
-fn scrape_all_properties<T: PlatformScraper>(
-    scraper: &T,
-    property_urls: Vec<String>,
-    cookies: Option<&str>,
-    max_items: Option<usize>,
-) -> Result<Vec<Property>> {
-    let mut properties = Vec::new();
+    // 3. Skip if already known or refresh when option is set
+    let urls_to_scrape: Vec<String> = if options.refresh {
+        println!("Refresh mode: scraping all {} URLs", found_urls.len());
+        found_urls
+    } else {
+        let new_urls: Vec<String> = found_urls
+            .into_iter()
+            .filter(|url| !existing_urls.contains(url))
+            .collect();
+        println!("Normal mode: {} new URLs to scrape", new_urls.len());
+        new_urls
+    };
     
-    for url in property_urls {
-        // Check if we've reached the maximum number of items
-        if let Some(max) = max_items {
-            if properties.len() >= max {
-                println!("Reached maximum number of items ({}), stopping", max);
-                break;
-            }
-        }
+    if urls_to_scrape.is_empty() {
+        println!("No URLs to scrape (all already known and refresh not set).");
+        return Ok(());
+    }
+    
+    // Apply max_items limit if specified
+    let urls_to_scrape = if let Some(max_items) = options.max_items {
+        let limited_urls = urls_to_scrape.into_iter().take(max_items).collect::<Vec<_>>();
+        println!("Limited to {} URLs due to max_items setting", limited_urls.len());
+        limited_urls
+    } else {
+        urls_to_scrape
+    };
+    
+    // Scrape the selected URLs
+    let mut newly_scraped = Vec::new();
+    for (i, url) in urls_to_scrape.iter().enumerate() {
+        println!("Scraping [{}/{}]: {}", i + 1, urls_to_scrape.len(), url);
         
-        println!("Scraping property: {}", url);
-        match scraper.scrape_property(&url, cookies) {
+        match scraper.scrape_property(url, options.cookies.as_deref()) {
             Ok(property) => {
-                properties.push(property);
+                newly_scraped.push(property);
             },
             Err(e) => {
                 eprintln!("Error scraping property {}: {}", url, e);
@@ -157,7 +106,50 @@ fn scrape_all_properties<T: PlatformScraper>(
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
     
-    Ok(properties)
+    println!("Successfully scraped {} properties", newly_scraped.len());
+    
+    // If in refresh mode, remove old versions of the URLs we just scraped
+    if options.refresh {
+        let scraped_urls: HashSet<String> = urls_to_scrape.into_iter().collect();
+        all_properties.retain(|p| !scraped_urls.contains(&p.url));
+        println!("Removed {} old entries for refreshed URLs", scraped_urls.len());
+    }
+    
+    // Add newly scraped properties
+    all_properties.extend(newly_scraped);
+    
+    // 4. Deduplicate by URL and backup/save
+    let deduplicated_properties = deduplicate_properties_by_url(all_properties);
+    println!("Final count after deduplication: {} properties", deduplicated_properties.len());
+    
+    // Backup and save the deduplicated results
+    utils::save_properties_to_csv(&deduplicated_properties, &options.output_file)?;
+    
+    Ok(())
+}
+
+/// Deduplicate properties by URL, keeping the last occurrence (most recent data)
+pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property> {
+    let mut seen_urls = HashSet::new();
+    let mut deduplicated = Vec::new();
+    
+    // Process in reverse order so we keep the last (most recent) occurrence of each URL
+    for property in properties.into_iter().rev() {
+        if seen_urls.insert(property.url.clone()) {
+            deduplicated.push(property);
+        }
+    }
+    
+    // Reverse back to maintain original order
+    deduplicated.reverse();
+    deduplicated
+}
+
+// Legacy functions for backwards compatibility
+pub struct ScrapingResult {
+    pub scraped_properties: Vec<Property>,
+    pub scraped_urls: Vec<String>,
+    pub is_refresh: bool,
 }
 
 pub fn merge_properties_with_refresh(
@@ -169,10 +161,11 @@ pub fn merge_properties_with_refresh(
         // In refresh mode, only remove properties that were actually scraped
         // Keep all other properties (including other platforms and non-scraped URLs from this platform)
         existing_properties.retain(|p| !result.scraped_urls.contains(&p.url));
-        existing_properties.extend(result.scraped_properties);
-    } else {
-        // In normal mode, just add new properties
-        existing_properties.extend(result.scraped_properties);
     }
-    existing_properties
+    
+    // Add the newly scraped properties
+    existing_properties.extend(result.scraped_properties);
+    
+    // Deduplicate by URL (keep the last occurrence to preserve refreshed data)
+    deduplicate_properties_by_url(existing_properties)
 }

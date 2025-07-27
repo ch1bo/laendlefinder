@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options, merge_properties_with_refresh};
+use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options};
 use laendlefinder::scrapers::{VolScraper, LaendleimmoScraper};
-use laendlefinder::utils;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about = "Laendlefinder - Property Scraper for Vorarlberg")]
@@ -42,12 +41,6 @@ fn main() -> Result<()> {
     println!("Laendlefinder - Property Scraper for Vorarlberg");
     println!("===============================================");
     
-    // Load existing properties first
-    let mut all_properties = utils::load_properties_from_csv(&args.output)?;
-    println!("Loaded {} existing properties", all_properties.len());
-    
-    let mut total_new_properties = 0;
-    
     // Create scraping options
     let options = ScrapingOptions {
         output_file: args.output.clone(),
@@ -59,42 +52,24 @@ fn main() -> Result<()> {
     
     // Run vol.at scraper (sold properties)
     if !args.skip_vol {
+        println!("\n--- Vol.at Scraper ---");
         let vol_scraper = VolScraper;
-        let vol_result = run_scraper_with_options(&vol_scraper, &options)?;
-        total_new_properties += vol_result.scraped_properties.len();
-        
-        all_properties = merge_properties_with_refresh(all_properties, vol_result, "vol.at");
+        run_scraper_with_options(&vol_scraper, &options)?;
     } else {
         println!("Skipping vol.at scraper");
     }
     
-    // Run laendleimmo.at scraper (available properties)
+    // Run laendleimmo.at scraper (available properties) 
     if !args.skip_laendleimmo {
+        println!("\n--- Laendleimmo.at Scraper ---");
         let laendleimmo_scraper = LaendleimmoScraper;
-        let laendleimmo_result = run_scraper_with_options(&laendleimmo_scraper, &options)?;
-        total_new_properties += laendleimmo_result.scraped_properties.len();
-        
-        all_properties = merge_properties_with_refresh(all_properties, laendleimmo_result, "laendleimmo.at");
+        run_scraper_with_options(&laendleimmo_scraper, &options)?;
     } else {
         println!("Skipping laendleimmo.at scraper");
     }
     
-    if total_new_properties == 0 && !args.refresh {
-        println!("\nNo new properties to add.");
-        return Ok(());
-    }
-    
-    // Save all properties to CSV (with backup)
-    utils::save_properties_to_csv(&all_properties, &args.output)?;
-    
-    println!("\n=== Summary ===");
-    if args.refresh {
-        println!("Total properties scraped/refreshed: {}", total_new_properties);
-    } else {
-        println!("Total new properties scraped: {}", total_new_properties);
-    }
-    println!("Total properties in database: {}", all_properties.len());
-    println!("Saved to: {}", args.output);
+    println!("\n=== All scraping completed ===");
+    println!("Results saved to: {}", args.output);
     
     Ok(())
 }

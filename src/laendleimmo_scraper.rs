@@ -512,7 +512,6 @@ fn extract_living_size_from_text(text: &str) -> Option<String> {
     // Fallback: first size that's not explicitly ground
     let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*m²").unwrap();
     if let Some(captures) = size_regex.captures(text) {
-        let full_match = captures.get(0).unwrap().as_str();
         let before_match = &text[..captures.get(0).unwrap().start()];
         // Skip if this looks like ground size
         if !before_match.to_lowercase().contains("grundstück") && 
