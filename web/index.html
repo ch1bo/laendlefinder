@@ -12,20 +12,119 @@
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            display: flex;
             height: 100vh;
+            overflow: hidden;
+            position: relative;
         }
         #map {
             height: 100vh;
-            width: 60%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: right 0.3s ease;
+        }
+        #map.sidebar-open {
+            right: 400px;
         }
         #sidebar {
-            width: 40%;
+            width: 400px;
+            min-width: 350px;
+            max-width: 500px;
             background-color: #f8f9fa;
             border-left: 1px solid #dee2e6;
             display: flex;
             flex-direction: column;
-            position: relative;
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        #sidebar.collapsed {
+            transform: translateX(100%);
+        }
+        
+        /* Sidebar toggle button */
+        .sidebar-toggle {
+            position: absolute;
+            top: 10px;
+            right: 410px;
+            z-index: 1001;
+            background: white;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+        .sidebar-toggle.collapsed {
+            right: 10px;
+        }
+        .sidebar-toggle:hover {
+            background: #f4f4f4;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            #map {
+                height: 60vh !important;
+                width: 100% !important;
+                right: 0 !important;
+                position: absolute;
+            }
+            #map.sidebar-open {
+                right: 0 !important;
+            }
+            #sidebar {
+                position: fixed;
+                top: 60vh;
+                left: 0;
+                right: 0;
+                width: 100%;
+                max-width: none;
+                min-width: none;
+                height: 40vh;
+                border-left: none;
+                border-top: 1px solid #dee2e6;
+                transform: translateY(0);
+            }
+            #sidebar.collapsed {
+                transform: translateY(100%);
+            }
+            .sidebar-toggle {
+                top: calc(60vh - 35px);
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                width: 60px;
+                height: 35px;
+                border-radius: 15px 15px 0 0;
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #map {
+                height: 70vh !important;
+            }
+            #sidebar {
+                top: 70vh;
+                height: 30vh;
+            }
+            .sidebar-toggle {
+                top: calc(70vh - 35px);
+                height: 35px;
+            }
         }
         .reset-button {
             position: absolute;
@@ -304,7 +403,8 @@
     </style>
 </head>
 <body>
-    <div id="map"></div>
+    <div class="sidebar-toggle" onclick="toggleSidebar()">✕</div>
+    <div id="map" class="sidebar-open"></div>
     <div id="sidebar">
         <button class="reset-button" onclick="resetView()">Reset View</button>
         <div class="filter-panel">
@@ -816,6 +916,34 @@
                 showOnlyVisible = true;
             }
         });
+
+        // Sidebar toggle functionality
+        let sidebarCollapsed = false;
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mapElement = document.getElementById('map');
+            const toggleButton = document.querySelector('.sidebar-toggle');
+            
+            sidebarCollapsed = !sidebarCollapsed;
+            
+            if (sidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+                mapElement.classList.remove('sidebar-open');
+                toggleButton.classList.add('collapsed');
+                toggleButton.innerHTML = '☰';
+            } else {
+                sidebar.classList.remove('collapsed');
+                mapElement.classList.add('sidebar-open');
+                toggleButton.classList.remove('collapsed');
+                toggleButton.innerHTML = '✕';
+            }
+            
+            // Trigger map resize after animation completes
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
 
         // Add automatic filter event listeners
         function setupFilterListeners() {
