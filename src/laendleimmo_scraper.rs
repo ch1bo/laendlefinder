@@ -1,4 +1,6 @@
 use crate::models::{ListingType, Property};
+use crate::tui::ScraperTUI;
+use crate::{debug_println, debug_eprintln};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use regex::Regex;
@@ -6,8 +8,12 @@ use scraper::{Html, Selector};
 
 const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt";
 
-pub fn scrape_all_listing_pages(max_pages: usize) -> Result<Vec<String>> {
+pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
     let mut all_property_urls = Vec::new();
+
+    if let Some(tui) = tui.as_mut() {
+        tui.start_gathering(max_pages)?;
+    }
 
     for page in 1..=max_pages {
         let page_url = if page == 1 {
@@ -16,28 +22,36 @@ pub fn scrape_all_listing_pages(max_pages: usize) -> Result<Vec<String>> {
             format!("{}?page={}", BASE_URL, page)
         };
 
-        println!("Scraping listing page: {}", page_url);
+        debug_println!("Scraping listing page: {}", page_url);
 
         match scrape_listing_page(&page_url) {
             Ok(urls) => {
                 if urls.is_empty() {
-                    println!("No more properties found on page {}, stopping", page);
+                    debug_println!("No more properties found on page {}, stopping", page);
                     break;
                 }
                 all_property_urls.extend(urls);
+                
+                if let Some(tui) = tui.as_mut() {
+                    tui.update_gathering_progress(page, max_pages, all_property_urls.len())?;
+                }
             }
             Err(e) => {
-                eprintln!("Error scraping page {}: {}", page, e);
+                debug_eprintln!("Error scraping page {}: {}", page, e);
                 break;
             }
         }
+    }
+
+    if let Some(tui) = tui.as_mut() {
+        tui.finish_gathering(all_property_urls.len())?;
     }
 
     Ok(all_property_urls)
 }
 
 pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
-    println!("Fetching listing page: {}", url);
+    debug_println!("Fetching listing page: {}", url);
 
     let response = reqwest::blocking::Client::new()
         .get(url)
@@ -72,12 +86,12 @@ pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
         }
     }
 
-    println!("Found {} property URLs on page", property_urls.len());
+    debug_println!("Found {} property URLs on page", property_urls.len());
     Ok(property_urls)
 }
 
 pub fn scrape_property_page(url: &str) -> Result<Property> {
-    println!("Scraping property page: {}", url);
+    debug_println!("Scraping property page: {}", url);
 
     let response = reqwest::blocking::Client::new()
         .get(url)
@@ -90,13 +104,13 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
 
     // Try to extract from JSON-LD first (most reliable)
     if let Ok(mut json_data) = extract_from_json_ld(&body) {
-        println!("Successfully extracted from JSON-LD");
+        debug_println!("Successfully extracted from JSON-LD");
         json_data.url = url.to_string(); // Set the URL
         return Ok(json_data);
     }
 
     // Fallback to HTML parsing
-    println!("JSON-LD extraction failed, falling back to HTML parsing");
+    debug_println!("JSON-LD extraction failed, falling back to HTML parsing");
     let title = extract_title(&document)?;
     let price = extract_price(&document)?;
     let location = extract_location(&document, url)?;
@@ -107,7 +121,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let coordinates = extract_coordinates_from_map(&body);
     let date = extract_date_from_html(&body);
 
-    println!(
+    debug_println!(
         "Extracted data: price={}, location={}, type={}, title={}, date={:?}",
         price, location, property_type, title, date
     );
@@ -420,7 +434,7 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         .and_then(|d| parse_date_string(d))
         .or_else(|| extract_date_from_html(body)); // Fallback to HTML parsing
 
-    println!(
+    debug_println!(
         "JSON-LD extracted: price={}, location={}, type={}, name={}, date={:?}",
         price, location, property_type, name, date
     );

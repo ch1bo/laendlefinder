@@ -3,6 +3,7 @@ use std::fs::{copy, File};
 use std::path::Path;
 // Removed the unused import: use csv::Writer;
 use crate::models::Property;
+use crate::{debug_println};
 
 // Since this function is never used, we can either remove it or keep it for future use
 // I'll keep it but add an allow attribute to suppress the warning
@@ -22,7 +23,7 @@ pub fn load_properties_from_csv(path: &str) -> Result<Vec<Property>> {
 
     // If the file doesn't exist, return an empty vector
     if !path.exists() {
-        println!(
+        debug_println!(
             "CSV file {} does not exist, creating a new one",
             path.display()
         );
@@ -41,7 +42,7 @@ pub fn load_properties_from_csv(path: &str) -> Result<Vec<Property>> {
         properties.push(property);
     }
 
-    println!(
+    debug_println!(
         "Loaded {} properties from {}",
         properties.len(),
         path.display()
@@ -60,7 +61,7 @@ pub fn save_properties_to_csv(properties: &[Property], path: &str) -> Result<()>
         copy(path, backup_path)
             .with_context(|| format!("Failed to create backup: {}", backup_path))?;
 
-        println!("Created backup: {}", backup_path);
+        debug_println!("Created backup: {}", backup_path);
     }
 
     let file =
@@ -78,7 +79,7 @@ pub fn save_properties_to_csv(properties: &[Property], path: &str) -> Result<()>
         .flush()
         .with_context(|| "Failed to flush CSV writer")?;
 
-    println!("Saved {} properties to {}", properties.len(), path);
+    debug_println!("Saved {} properties to {}", properties.len(), path);
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 use crate::common_scraper::PlatformScraper;
 use crate::models::{Property, ListingType};
+use crate::tui::ScraperTUI;
 use crate::{scraper, laendleimmo_scraper};
 use anyhow::Result;
 
@@ -10,8 +11,8 @@ impl PlatformScraper for VolScraper {
         "Vol.at"
     }
     
-    fn scrape_listings(&self, max_pages: usize) -> Result<Vec<String>> {
-        scraper::scrape_all_index_pages(max_pages)
+    fn scrape_listings(&self, max_pages: usize, tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+        scraper::scrape_all_index_pages(max_pages, tui)
     }
     
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property> {
@@ -26,8 +27,8 @@ impl PlatformScraper for LaendleimmoScraper {
         "Laendleimmo.at"
     }
     
-    fn scrape_listings(&self, max_pages: usize) -> Result<Vec<String>> {
-        laendleimmo_scraper::scrape_all_listing_pages(max_pages)
+    fn scrape_listings(&self, max_pages: usize, tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+        laendleimmo_scraper::scrape_all_listing_pages(max_pages, tui)
     }
     
     fn scrape_property(&self, url: &str, _cookies: Option<&str>) -> Result<Property> {

@@ -1,5 +1,7 @@
 use crate::models::{ListingType, Property};
 use crate::parser;
+use crate::tui::ScraperTUI;
+use crate::{debug_eprintln, debug_println};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use scraper::{Html, Selector};
@@ -7,39 +9,58 @@ use serde_json::Value;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
-pub fn scrape_all_index_pages(max_pages: usize) -> Result<Vec<String>> {
+pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
     let mut all_property_urls = Vec::new();
     let base_url = "https://www.vol.at/themen/grund-und-boden";
 
-    println!("Scraping index page: {}", base_url);
+    if let Some(tui) = tui.as_mut() {
+        tui.start_gathering(max_pages)?;
+    }
+
+    debug_println!("Scraping index page: {}", base_url);
 
     // Scrape the first page
     let property_urls = scrape_index_page()?;
     all_property_urls.extend(property_urls);
 
+    if let Some(tui) = tui.as_mut() {
+        tui.update_gathering_progress(1, max_pages, all_property_urls.len())?;
+    }
+
     // If max_pages is 1, we're done
     if max_pages <= 1 {
+        if let Some(tui) = tui.as_mut() {
+            tui.finish_gathering(all_property_urls.len())?;
+        }
         return Ok(all_property_urls);
     }
 
     // Otherwise, scrape additional pages up to max_pages
     for page in 2..=max_pages {
         let page_url = format!("{}?page={}", base_url, page);
-        println!("Scraping index page: {}", page_url);
+        debug_println!("Scraping index page: {}", page_url);
 
         match scrape_index_page_with_url(&page_url) {
             Ok(urls) => {
                 if urls.is_empty() {
-                    println!("No more properties found on page {}, stopping", page);
+                    debug_println!("No more properties found on page {}, stopping", page);
                     break;
                 }
                 all_property_urls.extend(urls);
+                
+                if let Some(tui) = tui.as_mut() {
+                    tui.update_gathering_progress(page, max_pages, all_property_urls.len())?;
+                }
             }
             Err(e) => {
-                eprintln!("Error scraping page {}: {}", page, e);
+                debug_eprintln!("Error scraping page {}: {}", page, e);
                 break;
             }
         }
+    }
+
+    if let Some(tui) = tui.as_mut() {
+        tui.finish_gathering(all_property_urls.len())?;
     }
 
     Ok(all_property_urls)
@@ -50,7 +71,7 @@ pub fn scrape_index_page() -> Result<Vec<String>> {
 }
 
 fn scrape_index_page_with_url(url: &str) -> Result<Vec<String>> {
-    println!("Scraping index page: {}", url);
+    debug_println!("Scraping index page: {}", url);
 
     // Fetch the index page
     let response = reqwest::blocking::get(url).context("Failed to fetch index page")?;
@@ -80,7 +101,7 @@ fn scrape_index_page_with_url(url: &str) -> Result<Vec<String>> {
         }
     }
 
-    println!("Found {} property links on page", links.len());
+    debug_println!("Found {} property links on page", links.len());
 
     Ok(links)
 }
@@ -90,7 +111,7 @@ pub fn scrape_property_page(
     cookies: Option<&str>,
     listing_type: ListingType,
 ) -> Result<Property> {
-    println!("Scraping property page: {}", url);
+    debug_println!("Scraping property page: {}", url);
 
     // Build request with optional cookies
     let mut request = reqwest::blocking::Client::new()
@@ -98,28 +119,28 @@ pub fn scrape_property_page(
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
 
     if let Some(cookie_str) = cookies {
-        println!("Using cookies: {}", cookie_str);
+        debug_println!("Using cookies: {}", cookie_str);
         // Try to add cookies, but continue even if it fails
         match reqwest::header::HeaderValue::from_str(cookie_str) {
             Ok(header_value) => {
                 request = request.header("Cookie", header_value);
             }
             Err(e) => {
-                println!(
+                debug_println!(
                     "Warning: Could not use cookies due to invalid format: {}",
                     e
                 );
-                println!("Continuing without cookies");
+                debug_println!("Continuing without cookies");
             }
         }
     } else {
-        println!("No cookies provided");
+        debug_println!("No cookies provided");
     }
 
     // Fetch the property page
     let response = match request.send() {
         Ok(resp) => {
-            println!("Response status: {}", resp.status());
+            debug_println!("Response status: {}", resp.status());
 
             if !resp.status().is_success() {
                 return Err(anyhow::anyhow!("HTTP error status: {}", resp.status()));
@@ -127,21 +148,21 @@ pub fn scrape_property_page(
             resp
         }
         Err(e) => {
-            eprintln!("Network error for {}: {:?}", url, e);
+            debug_eprintln!("Network error for {}: {:?}", url, e);
             return Err(anyhow::anyhow!("Failed to fetch property page: {}", e));
         }
     };
 
     let html = match response.text() {
         Ok(text) => {
-            println!("Received HTML content of length: {} bytes", text.len());
+            debug_println!("Received HTML content of length: {} bytes", text.len());
             if text.len() < 100 {
-                println!("Suspiciously short HTML content: {}", text);
+                debug_println!("Suspiciously short HTML content: {}", text);
             }
             text
         }
         Err(e) => {
-            eprintln!("Failed to get response text for {}: {:?}", url, e);
+            debug_eprintln!("Failed to get response text for {}: {:?}", url, e);
             return Err(anyhow::anyhow!("Failed to get response text: {}", e));
         }
     };
@@ -152,7 +173,7 @@ pub fn scrape_property_page(
     // Try to extract data from embedded JavaScript
     let script_selector = Selector::parse("#externalPostDataNode").unwrap();
     if let Some(script) = document.select(&script_selector).next() {
-        println!("Found externalPostDataNode script tag");
+        debug_println!("Found externalPostDataNode script tag");
         let json_str = script.inner_html();
 
         // Parse the JSON content
@@ -164,7 +185,7 @@ pub fn scrape_property_page(
     }
 
     // Fallback to traditional HTML parsing if JavaScript data not found
-    println!("JavaScript data not found, falling back to HTML parsing");
+    debug_println!("JavaScript data not found, falling back to HTML parsing");
 
     // Try different headline selectors
     let headline_selectors = [
@@ -178,20 +199,20 @@ pub fn scrape_property_page(
 
     let mut headline = String::new();
     for selector_str in headline_selectors {
-        println!("Trying headline selector: {}", selector_str);
+        debug_println!("Trying headline selector: {}", selector_str);
         if let Ok(selector) = Selector::parse(selector_str) {
             let headlines: Vec<String> = document
                 .select(&selector)
                 .map(|el| {
                     let text = el.text().collect::<String>();
-                    println!("Found with '{}': '{}'", selector_str, text);
+                    debug_println!("Found with '{}': '{}'", selector_str, text);
                     text
                 })
                 .collect();
 
             if let Some(first_headline) = headlines.first() {
                 headline = first_headline.to_string();
-                println!("Selected headline: '{}'", headline);
+                debug_println!("Selected headline: '{}'", headline);
                 break;
             }
         }
@@ -212,21 +233,23 @@ pub fn scrape_property_page(
             // Use the third word of the title as fallback
             let words: Vec<&str> = headline.split_whitespace().collect();
             if words.len() >= 3 {
-                println!(
+                debug_println!(
                     "Using third word of title as property type fallback: {}",
                     words[2]
                 );
                 words[2].to_string()
             } else {
-                println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
+                debug_println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
                 "Grundstück".to_string()
             }
         }
     };
 
-    println!(
+    debug_println!(
         "Extracted data: price={}, location={}, type={}",
-        price, location, property_type
+        price,
+        location,
+        property_type
     );
 
     // Create and return the Property
@@ -249,7 +272,7 @@ fn extract_property_from_json(
     url: &str,
     listing_type: &ListingType,
 ) -> Result<Property> {
-    println!("Extracting property data from JSON");
+    debug_println!("Extracting property data from JSON");
 
     // Navigate to the content section where property details are stored
     let post = &json["content"]["data"]["post"];
@@ -258,7 +281,7 @@ fn extract_property_from_json(
     let title = post["title"]
         .as_str()
         .context("Title not found in JSON data")?;
-    println!("Title from JSON: {}", title);
+    debug_println!("Title from JSON: {}", title);
 
     let location = parser::extract_location(title)?;
 
@@ -269,13 +292,13 @@ fn extract_property_from_json(
             // Use the third word of the title as fallback
             let words: Vec<&str> = title.split_whitespace().collect();
             if words.len() >= 3 {
-                println!(
+                debug_println!(
                     "Using third word of title as property type fallback: {}",
                     words[2]
                 );
                 words[2].to_string()
             } else {
-                println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
+                debug_println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
                 "Grundstück".to_string()
             }
         }
@@ -300,22 +323,22 @@ fn extract_property_from_json(
                 {
                     // Parse the data attribute which is a JSON string
                     if let Ok(data_json) = serde_json::from_str::<Value>(data_str) {
-                        println!("Found grund-und-boden data: {}", data_str);
+                        debug_println!("Found grund-und-boden data: {}", data_str);
 
                         // Extract price
                         match &data_json["price"] {
                             Value::Number(p) => {
                                 price = Some(p.to_string());
-                                println!("Found price: {}", p);
+                                debug_println!("Found price: {}", p);
                             }
                             _ => {
-                                println!("Price not found in JSON data");
+                                debug_println!("Price not found in JSON data");
                             }
                         }
 
                         // Extract transaction date
                         if let Some(date_str) = data_json["transactionDate"].as_str() {
-                            println!("Found transaction date: {}", date_str);
+                            debug_println!("Found transaction date: {}", date_str);
                             // Parse the date in format YYYY-MM-DD
                             if let Ok(parsed_date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                             {
@@ -329,26 +352,26 @@ fn extract_property_from_json(
                                 (coords["lat"].as_f64(), coords["lng"].as_f64())
                             {
                                 coordinates = Some((lat, lng));
-                                println!("Found coordinates: lat={}, lng={}", lat, lng);
+                                debug_println!("Found coordinates: lat={}, lng={}", lat, lng);
                             }
                         }
 
                         // Extract address
                         if let Some(addr) = data_json["address"].as_str() {
                             address = Some(addr.to_string());
-                            println!("Found address: {}", addr);
+                            debug_println!("Found address: {}", addr);
                         }
 
                         // Extract living size
                         if let Some(size) = data_json["sizeLiving"].as_str() {
                             size_living = Some(size.to_string());
-                            println!("Found living size: {}", size);
+                            debug_println!("Found living size: {}", size);
                         }
 
                         // Extract ground size
                         if let Some(size) = data_json["sizeGround"].as_str() {
                             size_ground = Some(size.to_string());
-                            println!("Found ground size: {}", size);
+                            debug_println!("Found ground size: {}", size);
                         }
                     }
                 }
@@ -356,9 +379,12 @@ fn extract_property_from_json(
         }
     }
 
-    println!(
+    debug_println!(
         "Extracted data from JSON: price={:?}, location={}, type={}, date={:?}",
-        price, location, property_type, date
+        price,
+        location,
+        property_type,
+        date
     );
 
     // Create and return the Property

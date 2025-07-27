@@ -5,3 +5,5 @@ pub mod utils;
 pub mod laendleimmo_scraper;
 pub mod common_scraper;
 pub mod scrapers;
+pub mod tui;
+pub mod debug;

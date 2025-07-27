@@ -1,5 +1,7 @@
 use crate::models::Property;
 use crate::utils;
+use crate::tui::ScraperTUI;
+use crate::debug;
 use anyhow::Result;
 use std::collections::HashSet;
 
@@ -10,6 +12,7 @@ pub struct ScrapingOptions {
     pub max_items: Option<usize>,
     pub refresh: bool,
     pub cookies: Option<String>,
+    pub debug: bool,
 }
 
 impl Default for ScrapingOptions {
@@ -20,17 +23,18 @@ impl Default for ScrapingOptions {
             max_items: None,
             refresh: false,
             cookies: None,
+            debug: false,
         }
     }
 }
 
 pub trait PlatformScraper {
     fn name(&self) -> &str;
-    fn scrape_listings(&self, max_pages: usize) -> Result<Vec<String>>;
+    fn scrape_listings(&self, max_pages: usize, tui: Option<&mut ScraperTUI>) -> Result<Vec<String>>;
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property>;
 }
 
-/// Main scraping function that implements the new algorithm:
+/// Main scraping function that implements the new algorithm with TUI:
 /// 1. Load all existing URLs
 /// 2. Find listings according to parameters  
 /// 3. Skip if already known or refresh when option is set
@@ -39,12 +43,14 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     scraper: &T,
     options: &ScrapingOptions,
 ) -> Result<()> {
-    println!("{} Property Scraper", scraper.name());
-    println!("{}", "=".repeat(scraper.name().len() + 17));
+    // Set global debug flag
+    debug::set_debug(options.debug);
+    
+    let mut tui = ScraperTUI::new();
     
     // 1. Load all existing properties
     let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
-    println!("Loaded {} existing properties", all_properties.len());
+    tui.show_summary(all_properties.len())?;
     
     // Create a set of existing URLs for fast lookup
     let existing_urls: HashSet<String> = all_properties
@@ -53,52 +59,69 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         .collect();
     
     // 2. Find listings according to parameters
-    let found_urls = scraper.scrape_listings(options.max_pages)?;
-    println!("Found {} property URLs from listings", found_urls.len());
+    let found_urls = scraper.scrape_listings(options.max_pages, Some(&mut tui))?;
     
     if found_urls.is_empty() {
-        println!("No properties found in listings.");
+        tui.update_listing_status(0, 0)?;
         return Ok(());
     }
     
     // 3. Skip if already known or refresh when option is set
-    let urls_to_scrape: Vec<String> = if options.refresh {
-        println!("Refresh mode: scraping all {} URLs", found_urls.len());
-        found_urls
+    let mut new_urls = Vec::new();
+    let mut known_count = 0;
+    
+    // Count new vs known regardless of refresh mode
+    for url in &found_urls {
+        if existing_urls.contains(url) {
+            known_count += 1;
+        } else {
+            new_urls.push(url.clone());
+        }
+    }
+    
+    let urls_to_scrape = if options.refresh {
+        found_urls  // Scrape all URLs in refresh mode
     } else {
-        let new_urls: Vec<String> = found_urls
-            .into_iter()
-            .filter(|url| !existing_urls.contains(url))
-            .collect();
-        println!("Normal mode: {} new URLs to scrape", new_urls.len());
-        new_urls
+        new_urls.clone()  // Only scrape new URLs in normal mode
     };
     
+    let new_count = new_urls.len();
+    let refresh_count = if options.refresh { known_count } else { 0 };
+    
+    if options.refresh && known_count > 0 {
+        tui.update_listing_status_refresh(new_count, refresh_count)?;
+    } else {
+        tui.update_listing_status(new_count, known_count)?;
+    }
+    
     if urls_to_scrape.is_empty() {
-        println!("No URLs to scrape (all already known and refresh not set).");
         return Ok(());
     }
     
     // Apply max_items limit if specified
     let urls_to_scrape = if let Some(max_items) = options.max_items {
-        let limited_urls = urls_to_scrape.into_iter().take(max_items).collect::<Vec<_>>();
-        println!("Limited to {} URLs due to max_items setting", limited_urls.len());
-        limited_urls
+        urls_to_scrape.into_iter().take(max_items).collect::<Vec<_>>()
     } else {
         urls_to_scrape
     };
     
+    // Add all properties to TUI as pending
+    for url in &urls_to_scrape {
+        tui.add_property(url.clone())?;
+    }
+    
     // Scrape the selected URLs
     let mut newly_scraped = Vec::new();
-    for (i, url) in urls_to_scrape.iter().enumerate() {
-        println!("Scraping [{}/{}]: {}", i + 1, urls_to_scrape.len(), url);
+    for url in urls_to_scrape.iter() {
+        tui.start_scraping_property(url)?;
         
         match scraper.scrape_property(url, options.cookies.as_deref()) {
             Ok(property) => {
                 newly_scraped.push(property);
+                tui.complete_property(url)?;
             },
-            Err(e) => {
-                eprintln!("Error scraping property {}: {}", url, e);
+            Err(_e) => {
+                tui.fail_property(url)?;
             }
         }
         
@@ -106,24 +129,24 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
     
-    println!("Successfully scraped {} properties", newly_scraped.len());
-    
     // If in refresh mode, remove old versions of the URLs we just scraped
     if options.refresh {
         let scraped_urls: HashSet<String> = urls_to_scrape.into_iter().collect();
         all_properties.retain(|p| !scraped_urls.contains(&p.url));
-        println!("Removed {} old entries for refreshed URLs", scraped_urls.len());
     }
     
-    // Add newly scraped properties
+    // Add newly scraped properties  
+    let scraped_count = newly_scraped.len();
     all_properties.extend(newly_scraped);
     
     // 4. Deduplicate by URL and backup/save
     let deduplicated_properties = deduplicate_properties_by_url(all_properties);
-    println!("Final count after deduplication: {} properties", deduplicated_properties.len());
     
     // Backup and save the deduplicated results
     utils::save_properties_to_csv(&deduplicated_properties, &options.output_file)?;
+    
+    // Show final summary
+    tui.show_final_summary(scraped_count, deduplicated_properties.len())?;
     
     Ok(())
 }

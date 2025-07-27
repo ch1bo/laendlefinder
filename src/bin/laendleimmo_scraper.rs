@@ -21,6 +21,10 @@ struct Args {
     /// Re-scrape already known URLs to refresh data
     #[clap(short, long)]
     refresh: bool,
+    
+    /// Enable debug output
+    #[clap(short, long)]
+    debug: bool,
 }
 
 fn main() -> Result<()> {
@@ -33,6 +37,7 @@ fn main() -> Result<()> {
         max_items: args.max_items,
         refresh: args.refresh,
         cookies: None, // laendleimmo doesn't use cookies
+        debug: args.debug,
     };
     
     // Run laendleimmo.at scraper with new simplified API
