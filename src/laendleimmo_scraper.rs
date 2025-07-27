@@ -103,6 +103,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let property_type = extract_property_type(&document, url)?;
     let address = extract_address_from_location(&document);
     let size_living = extract_living_size(&document);
+    let size_ground = extract_ground_size(&document);
     let coordinates = extract_coordinates_from_map(&body);
     let date = extract_date_from_html(&body);
 
@@ -121,6 +122,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         coordinates,
         address,
         size_living,
+        size_ground,
     })
 }
 
@@ -261,7 +263,61 @@ fn extract_living_size(document: &Html) -> Option<String> {
         if let Ok(selector) = Selector::parse(selector_str) {
             for element in document.select(&selector) {
                 let text = element.text().collect::<Vec<_>>().join(" ");
-                if text.contains("m²") || text.contains("qm") {
+                // Look for Wohnfläche specifically
+                if (text.to_lowercase().contains("wohnfläche") || text.to_lowercase().contains("wohnflaeche"))
+                    && (text.contains("m²") || text.contains("qm")) {
+                    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
+                    if let Some(captures) = size_regex.captures(&text) {
+                        if let Some(size) = captures.get(1) {
+                            return Some(size.as_str().replace(",", "."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: any size that's not ground size
+    for selector_str in &size_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                let text = element.text().collect::<Vec<_>>().join(" ");
+                if (text.contains("m²") || text.contains("qm")) && 
+                   !text.to_lowercase().contains("grundstück") &&
+                   !text.to_lowercase().contains("grund") {
+                    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
+                    if let Some(captures) = size_regex.captures(&text) {
+                        if let Some(size) = captures.get(1) {
+                            return Some(size.as_str().replace(",", "."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_ground_size(document: &Html) -> Option<String> {
+    let size_selectors = [
+        ".plot-area",
+        ".grundstuecksflaeche",
+        ".grundstueck",
+        "[class*='ground']",
+        "[class*='plot']",
+        ".groesse",
+    ];
+
+    for selector_str in &size_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                let text = element.text().collect::<Vec<_>>().join(" ");
+                // Look for Grundstücksfläche specifically
+                if (text.to_lowercase().contains("grundstück") || 
+                    text.to_lowercase().contains("grundstueck") ||
+                    text.to_lowercase().contains("grund")) &&
+                   (text.contains("m²") || text.contains("qm")) {
                     let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
                     if let Some(captures) = size_regex.captures(&text) {
                         if let Some(size) = captures.get(1) {
@@ -352,9 +408,10 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         coordinates = extract_coordinates_from_map(body);
     }
 
-    // Extract living size from description
+    // Extract living size and ground size from description
     let description = json["description"].as_str().unwrap_or("");
-    let size_living = extract_size_from_text(description);
+    let size_living = extract_living_size_from_text(description);
+    let size_ground = extract_ground_size_from_text(description);
 
     // Extract date from datePublished or dateCreated in JSON-LD
     let date = json["datePublished"]
@@ -378,6 +435,7 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         coordinates,
         address,
         size_living,
+        size_ground,
     })
 }
 
@@ -442,9 +500,35 @@ fn extract_coordinates_from_map(body: &str) -> Option<(f64, f64)> {
     None
 }
 
-fn extract_size_from_text(text: &str) -> Option<String> {
-    let size_regex = Regex::new(r"(\d+(?:,\d+)?)\s*m²").unwrap();
+fn extract_living_size_from_text(text: &str) -> Option<String> {
+    // Look for Wohnfläche specifically
+    let wohn_regex = Regex::new(r"wohnfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²").unwrap();
+    if let Some(captures) = wohn_regex.captures(&text.to_lowercase()) {
+        if let Some(size) = captures.get(1) {
+            return Some(size.as_str().replace(',', "."));
+        }
+    }
+    
+    // Fallback: first size that's not explicitly ground
+    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*m²").unwrap();
     if let Some(captures) = size_regex.captures(text) {
+        let full_match = captures.get(0).unwrap().as_str();
+        let before_match = &text[..captures.get(0).unwrap().start()];
+        // Skip if this looks like ground size
+        if !before_match.to_lowercase().contains("grundstück") && 
+           !before_match.to_lowercase().contains("grund") {
+            if let Some(size) = captures.get(1) {
+                return Some(size.as_str().replace(',', "."));
+            }
+        }
+    }
+    None
+}
+
+fn extract_ground_size_from_text(text: &str) -> Option<String> {
+    // Look for Grundstücksfläche specifically
+    let grund_regex = Regex::new(r"grundst[üu]ck(?:sfl[äa]che)?[:\s]*(\d+(?:[.,]\d+)?)\s*m²").unwrap();
+    if let Some(captures) = grund_regex.captures(&text.to_lowercase()) {
         if let Some(size) = captures.get(1) {
             return Some(size.as_str().replace(',', "."));
         }

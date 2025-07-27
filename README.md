@@ -2,6 +2,9 @@
 
 A hobby project to collect historical real estate sales data from Vorarlberg and visualize it on OpenStreetMap.
 
+> [!WARNING]
+> This is fully vibe coded.. Don't judge me for code quality!
+
 ## Project Components
 
 1. **Data Scraper**: Collects and stores real estate sales data (Rust)

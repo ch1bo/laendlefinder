@@ -240,6 +240,7 @@ pub fn scrape_property_page(
         coordinates: None,
         address: None,
         size_living: None,
+        size_ground: None,
     })
 }
 
@@ -286,6 +287,7 @@ fn extract_property_from_json(
     let mut coordinates = None;
     let mut address = None;
     let mut size_living = None;
+    let mut size_ground = None;
 
     // Look for the GrundUndBoden block which contains structured data
     if let Some(blocks) = post["blocks"].as_array() {
@@ -345,8 +347,8 @@ fn extract_property_from_json(
 
                         // Extract ground size
                         if let Some(size) = data_json["sizeGround"].as_str() {
+                            size_ground = Some(size.to_string());
                             println!("Found ground size: {}", size);
-                            // FIXME: add ground size to Property model
                         }
                     }
                 }
@@ -370,5 +372,6 @@ fn extract_property_from_json(
         coordinates,
         address,
         size_living,
+        size_ground,
     })
 }
