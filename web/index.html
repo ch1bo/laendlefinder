@@ -241,6 +241,29 @@
                 </label>
             </div>
             <div class="filter-group">
+                <div class="filter-title" style="font-size: 0.9em; margin-bottom: 8px;">Property Types</div>
+                <label>
+                    <input type="checkbox" id="filter-apartment" checked> 
+                    <span>Wohnung</span>
+                    <span id="apartment-count" class="filter-count"></span>
+                </label>
+                <label>
+                    <input type="checkbox" id="filter-house" checked> 
+                    <span>Haus</span>
+                    <span id="house-count" class="filter-count"></span>
+                </label>
+                <label>
+                    <input type="checkbox" id="filter-land" checked> 
+                    <span>Grundstück</span>
+                    <span id="land-count" class="filter-count"></span>
+                </label>
+                <label>
+                    <input type="checkbox" id="filter-unknown" checked> 
+                    <span>Unbekannt</span>
+                    <span id="unknown-count" class="filter-count"></span>
+                </label>
+            </div>
+            <div class="filter-group">
                 <button onclick="applyFilters()">Apply Filters</button>
             </div>
         </div>
@@ -369,7 +392,7 @@
             return `
                 <div class="popup-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
                 <div class="popup-location">${property.location}</div>
-                <div class="popup-type">${property.property_type}</div>
+                <div class="popup-type">${formatPropertyType(property.property_type)}</div>
             `;
         }
 
@@ -381,7 +404,7 @@
             // Title
             const title = document.createElement('div');
             title.className = 'info-title';
-            title.textContent = `${property.location} - ${property.property_type}`;
+            title.textContent = `${property.location} - ${formatPropertyType(property.property_type)}`;
             container.appendChild(title);
             
             // Listing Type
@@ -433,9 +456,17 @@
         function updateFilterCounts() {
             const availableCount = allProperties.filter(p => p.listing_type === 'available').length;
             const soldCount = allProperties.filter(p => p.listing_type === 'sold').length;
+            const apartmentCount = allProperties.filter(p => p.property_type === 'apartment').length;
+            const houseCount = allProperties.filter(p => p.property_type === 'house').length;
+            const landCount = allProperties.filter(p => p.property_type === 'land').length;
+            const unknownCount = allProperties.filter(p => p.property_type === 'unknown').length;
             
             document.getElementById('available-count').textContent = `(${availableCount})`;
             document.getElementById('sold-count').textContent = `(${soldCount})`;
+            document.getElementById('apartment-count').textContent = `(${apartmentCount})`;
+            document.getElementById('house-count').textContent = `(${houseCount})`;
+            document.getElementById('land-count').textContent = `(${landCount})`;
+            document.getElementById('unknown-count').textContent = `(${unknownCount})`;
         }
 
         // Function to display properties in the list
@@ -469,7 +500,7 @@
                 propertyDiv.propertyData = property; // Store property reference
                 
                 propertyDiv.innerHTML = `
-                    <div class="property-title">${property.location} - ${property.property_type}</div>
+                    <div class="property-title">${property.location} - ${formatPropertyType(property.property_type)}</div>
                     <div class="property-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
                     <div class="property-location">${property.address || property.location}</div>
                     <div class="property-stats">
@@ -503,14 +534,37 @@
             return `€${numPrice.toLocaleString()}`;
         }
 
+        // Helper function to convert property type to German label
+        function formatPropertyType(propertyType) {
+            switch (propertyType) {
+                case 'apartment': return 'Wohnung';
+                case 'house': return 'Haus';
+                case 'land': return 'Grundstück';
+                case 'unknown': return 'Unbekannt';
+                default: return propertyType;
+            }
+        }
+
         // Function to apply filters
         function applyFilters() {
             const showAvailable = document.getElementById('filter-available').checked;
             const showSold = document.getElementById('filter-sold').checked;
+            const showApartment = document.getElementById('filter-apartment').checked;
+            const showHouse = document.getElementById('filter-house').checked;
+            const showLand = document.getElementById('filter-land').checked;
+            const showUnknown = document.getElementById('filter-unknown').checked;
             
             filteredProperties = allProperties.filter(property => {
+                // Filter by listing type
                 if (property.listing_type === 'available' && !showAvailable) return false;
                 if (property.listing_type === 'sold' && !showSold) return false;
+                
+                // Filter by property type
+                if (property.property_type === 'apartment' && !showApartment) return false;
+                if (property.property_type === 'house' && !showHouse) return false;
+                if (property.property_type === 'land' && !showLand) return false;
+                if (property.property_type === 'unknown' && !showUnknown) return false;
+                
                 return true;
             });
             
@@ -585,7 +639,7 @@
                 'URL': property.url,
                 'Price': property.price,
                 'Location': property.location,
-                'Property Type': property.property_type,
+                'Property Type': formatPropertyType(property.property_type),
                 'Listing Type': property.listing_type,
                 'Date': property.date,
                 'Coordinates': property.coordinates,
