@@ -1,4 +1,4 @@
-use crate::models::{ListingType, Property};
+use crate::models::{ListingType, Property, PropertyType};
 use crate::parser;
 use crate::tui::ScraperTUI;
 use crate::{debug_eprintln, debug_println};
@@ -226,24 +226,8 @@ pub fn scrape_property_page(
     let price = parser::extract_price(&headline)?;
     let location = parser::extract_location(&headline)?;
 
-    // Try to extract property type, but don't fail if not found
-    let property_type = match parser::extract_property_type(&headline) {
-        Ok(pt) => pt,
-        Err(_) => {
-            // Use the third word of the title as fallback
-            let words: Vec<&str> = headline.split_whitespace().collect();
-            if words.len() >= 3 {
-                debug_println!(
-                    "Using third word of title as property type fallback: {}",
-                    words[2]
-                );
-                words[2].to_string()
-            } else {
-                debug_println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
-                "Grundstück".to_string()
-            }
-        }
-    };
+    // Extract property type using classification
+    let property_type = PropertyType::from_string(&headline);
 
     debug_println!(
         "Extracted data: price={}, location={}, type={}",
@@ -285,24 +269,8 @@ fn extract_property_from_json(
 
     let location = parser::extract_location(title)?;
 
-    // Try to extract property type, but don't fail if not found
-    let property_type = match parser::extract_property_type(title) {
-        Ok(pt) => pt,
-        Err(_) => {
-            // Use the third word of the title as fallback
-            let words: Vec<&str> = title.split_whitespace().collect();
-            if words.len() >= 3 {
-                debug_println!(
-                    "Using third word of title as property type fallback: {}",
-                    words[2]
-                );
-                words[2].to_string()
-            } else {
-                debug_println!("Could not extract property type and title has fewer than 3 words, using 'Grundstück' as fallback");
-                "Grundstück".to_string()
-            }
-        }
-    };
+    // Extract property type using classification
+    let property_type = PropertyType::from_string(title);
 
     // Try to extract the transaction date and coordinates from the structured data
     let mut price = None;

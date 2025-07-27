@@ -1,4 +1,4 @@
-use crate::models::{ListingType, Property};
+use crate::models::{ListingType, Property, PropertyType};
 use crate::tui::ScraperTUI;
 use crate::{debug_println, debug_eprintln};
 use anyhow::{Context, Result};
@@ -114,7 +114,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let title = extract_title(&document)?;
     let price = extract_price(&document)?;
     let location = extract_location(&document, url)?;
-    let property_type = extract_property_type(&document, url)?;
+    let property_type = extract_property_type(&document, url);
     let address = extract_address_from_location(&document);
     let size_living = extract_living_size(&document);
     let size_ground = extract_ground_size(&document);
@@ -234,12 +234,15 @@ fn extract_location(document: &Html, url: &str) -> Result<String> {
     Ok("Unknown".to_string())
 }
 
-fn extract_property_type(document: &Html, url: &str) -> Result<String> {
+fn extract_property_type(document: &Html, url: &str) -> PropertyType {
     // Try to extract from URL first
     let url_regex = Regex::new(r"/immobilien/([^/]+)/").unwrap();
     if let Some(captures) = url_regex.captures(url) {
         if let Some(prop_type) = captures.get(1) {
-            return Ok(prop_type.as_str().to_string());
+            let classified = PropertyType::from_string(prop_type.as_str());
+            if !matches!(classified, PropertyType::Unknown) {
+                return classified;
+            }
         }
     }
 
@@ -256,13 +259,16 @@ fn extract_property_type(document: &Html, url: &str) -> Result<String> {
                     .trim()
                     .to_string();
                 if !text.is_empty() {
-                    return Ok(text);
+                    let classified = PropertyType::from_string(&text);
+                    if !matches!(classified, PropertyType::Unknown) {
+                        return classified;
+                    }
                 }
             }
         }
     }
 
-    Ok("Unknown".to_string())
+    PropertyType::Unknown
 }
 
 fn extract_living_size(document: &Html) -> Option<String> {
@@ -383,14 +389,8 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         .unwrap_or("Unknown")
         .to_string();
 
-    // Extract property type from URL structure or name
-    let property_type = if name.to_lowercase().contains("wohnung") {
-        "wohnung".to_string()
-    } else if name.to_lowercase().contains("haus") {
-        "haus".to_string()
-    } else {
-        "immobilie".to_string()
-    };
+    // Extract property type from name using classification
+    let property_type = PropertyType::from_string(name);
 
     // Extract address
     let street = json["location"]["address"]["streetAddress"]

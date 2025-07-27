@@ -579,6 +579,21 @@
 
         // Function to highlight a property in the list when its marker is clicked
         function highlightProperty(property) {
+            // Log property data to console
+            console.log('Property highlighted:', property);
+            console.table({
+                'URL': property.url,
+                'Price': property.price,
+                'Location': property.location,
+                'Property Type': property.property_type,
+                'Listing Type': property.listing_type,
+                'Date': property.date,
+                'Coordinates': property.coordinates,
+                'Address': property.address,
+                'Living Size': property.size_living,
+                'Ground Size': property.size_ground
+            });
+            
             // Clear previous property highlighting
             if (currentHighlightedProperty) {
                 currentHighlightedProperty.classList.remove('highlighted');

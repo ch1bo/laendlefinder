@@ -9,11 +9,30 @@ pub enum ListingType {
     Sold,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum PropertyType {
+    Apartment,
+    House,
+    Land,
+    Unknown,
+}
+
 impl fmt::Display for ListingType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ListingType::Available => write!(f, "available"),
             ListingType::Sold => write!(f, "sold"),
+        }
+    }
+}
+
+impl fmt::Display for PropertyType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PropertyType::Apartment => write!(f, "apartment"),
+            PropertyType::House => write!(f, "house"),
+            PropertyType::Land => write!(f, "land"),
+            PropertyType::Unknown => write!(f, "unknown"),
         }
     }
 }
@@ -44,12 +63,77 @@ impl<'de> Deserialize<'de> for ListingType {
     }
 }
 
+impl Serialize for PropertyType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for PropertyType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "apartment" => Ok(PropertyType::Apartment),
+            "house" => Ok(PropertyType::House),
+            "land" => Ok(PropertyType::Land),
+            "unknown" => Ok(PropertyType::Unknown),
+            _ => Ok(PropertyType::Unknown), // Default to Unknown for unrecognized types
+        }
+    }
+}
+
+impl PropertyType {
+    /// Classify a property type from a string (case-insensitive)
+    pub fn from_string(input: &str) -> Self {
+        let normalized = input.to_lowercase();
+
+        // Check for apartment/flat keywords
+        if normalized.contains("wohnung")
+            || normalized.contains("apartment")
+            || normalized.contains("flat")
+            || normalized.contains("eigentumswohnung")
+        {
+            return PropertyType::Apartment;
+        }
+
+        // Check for house keywords
+        if normalized.contains("haus")
+            || normalized.contains("house")
+            || normalized.contains("einfamilienhaus")
+            || normalized.contains("reihenhaus")
+            || normalized.contains("villa")
+            || normalized.contains("doppelhaus")
+        {
+            return PropertyType::House;
+        }
+
+        // Check for land/plot keywords
+        if normalized.contains("grundstück")
+            || normalized.contains("grund")
+            || normalized.contains("land")
+            || normalized.contains("bauland")
+            || normalized.contains("plot")
+            || normalized.contains("bauplatz")
+        {
+            return PropertyType::Land;
+        }
+
+        PropertyType::Unknown
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Property {
     pub url: String,
     pub price: String,
     pub location: String,
-    pub property_type: String,
+    pub property_type: PropertyType,
     pub listing_type: ListingType,
     pub date: Option<NaiveDate>,
     pub coordinates: Option<(f64, f64)>,
@@ -98,7 +182,7 @@ impl<'de> Deserialize<'de> for Property {
             url: String,
             price: String,
             location: String,
-            property_type: String,
+            property_type: PropertyType,
             listing_type: ListingType,
             date: Option<NaiveDate>,
             coordinates: String,
