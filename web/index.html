@@ -627,8 +627,41 @@
             crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script>
-        // Initialize the map centered on Vorarlberg, Austria
-        const map = L.map('map').setView([47.2499, 9.9809], 10);
+        // Local storage functions for map position
+        function saveMapPosition(lat, lng, zoom) {
+            const mapPosition = {
+                lat: lat,
+                lng: lng,
+                zoom: zoom,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('laendlefinderMapPosition', JSON.stringify(mapPosition));
+        }
+        
+        function getStoredMapPosition() {
+            try {
+                const stored = localStorage.getItem('laendlefinderMapPosition');
+                if (stored) {
+                    const position = JSON.parse(stored);
+                    // Only use stored position if it's less than 7 days old
+                    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+                    if (Date.now() - position.timestamp < sevenDaysInMs) {
+                        return position;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading stored map position:', error);
+            }
+            return null;
+        }
+        
+        // Initialize the map with stored position or default to Vorarlberg, Austria
+        const storedPosition = getStoredMapPosition();
+        const initialLat = storedPosition ? storedPosition.lat : 47.2499;
+        const initialLng = storedPosition ? storedPosition.lng : 9.9809;
+        const initialZoom = storedPosition ? storedPosition.zoom : 10;
+        
+        const map = L.map('map').setView([initialLat, initialLng], initialZoom);
 
         // Add OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1057,6 +1090,8 @@
             showOnlyVisible = false;
             clearHighlights();
             map.setView([47.2499, 9.9809], 10); // Reset to initial Vorarlberg view
+            // Save the reset position to local storage
+            saveMapPosition(47.2499, 9.9809, 10);
             applyFilters(); // Refresh the display
             closeSidebar(); // Close the panel after reset
         }
@@ -1160,8 +1195,13 @@
             }
         });
 
-        // Add map event listeners for automatic visible filtering
+        // Add map event listeners for automatic visible filtering and position saving
         map.on('moveend zoomend', function() {
+            // Save current map position to local storage
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            saveMapPosition(center.lat, center.lng, zoom);
+            
             if (showOnlyVisible) {
                 filterListByVisibleMarkers();
             }
