@@ -101,51 +101,55 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
     tui.show_summary(all_properties.len())?;
     
-    // Create a set of existing URLs for fast lookup
-    let existing_urls: HashSet<String> = all_properties
-        .iter()
-        .map(|p| p.url.clone())
-        .collect();
-    
-    // 2. Find listings according to parameters
-    let found_urls = scraper.scrape_listings(options.max_pages, Some(&mut tui))?;
-    
-    if found_urls.is_empty() {
-        tui.update_listing_status(0, 0)?;
-        return Ok(());
-    }
-    
-    // 3. Skip if already known or refresh when option is set
-    let mut new_urls = Vec::new();
-    let mut known_count = 0;
-    
-    // Count new vs known regardless of refresh mode
-    for url in &found_urls {
-        if existing_urls.contains(url) {
-            known_count += 1;
-        } else {
-            new_urls.push(url.clone());
-        }
-    }
-    
     let urls_to_scrape = if options.refresh {
-        found_urls  // Scrape all URLs in refresh mode
+        // In refresh mode, use existing URLs instead of gathering new ones
+        let existing_urls: Vec<String> = all_properties
+            .iter()
+            .map(|p| p.url.clone())
+            .collect();
+        
+        if existing_urls.is_empty() {
+            tui.update_listing_status(0, 0)?;
+            return Ok(());
+        }
+        
+        tui.update_listing_status_refresh(0, existing_urls.len())?;
+        existing_urls
     } else {
-        new_urls.clone()  // Only scrape new URLs in normal mode
+        // Normal mode: gather new links from listings
+        // Create a set of existing URLs for fast lookup
+        let existing_urls: HashSet<String> = all_properties
+            .iter()
+            .map(|p| p.url.clone())
+            .collect();
+            
+        let found_urls = scraper.scrape_listings(options.max_pages, Some(&mut tui))?;
+        
+        if found_urls.is_empty() {
+            tui.update_listing_status(0, 0)?;
+            return Ok(());
+        }
+        
+        // Filter out existing URLs in normal mode
+        let mut new_urls = Vec::new();
+        let mut known_count = 0;
+        
+        for url in &found_urls {
+            if existing_urls.contains(url) {
+                known_count += 1;
+            } else {
+                new_urls.push(url.clone());
+            }
+        }
+        
+        tui.update_listing_status(new_urls.len(), known_count)?;
+        
+        if new_urls.is_empty() {
+            return Ok(());
+        }
+        
+        new_urls
     };
-    
-    let new_count = new_urls.len();
-    let refresh_count = if options.refresh { known_count } else { 0 };
-    
-    if options.refresh && known_count > 0 {
-        tui.update_listing_status_refresh(new_count, refresh_count)?;
-    } else {
-        tui.update_listing_status(new_count, known_count)?;
-    }
-    
-    if urls_to_scrape.is_empty() {
-        return Ok(());
-    }
     
     // Apply max_items limit if specified
     let urls_to_scrape = if let Some(max_items) = options.max_items {
@@ -180,7 +184,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     
     // If in refresh mode, remove old versions of the URLs we just scraped
     if options.refresh {
-        let scraped_urls: HashSet<String> = urls_to_scrape.into_iter().collect();
+        let scraped_urls: HashSet<String> = urls_to_scrape.iter().cloned().collect();
         all_properties.retain(|p| !scraped_urls.contains(&p.url));
     }
     
