@@ -103,7 +103,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let document = Html::parse_document(&body);
 
     // Try to extract from JSON-LD first (most reliable)
-    if let Ok(mut json_data) = extract_from_json_ld(&body) {
+    if let Ok(mut json_data) = extract_from_json_ld(&body, url) {
         debug_println!("Successfully extracted from JSON-LD");
         json_data.url = url.to_string(); // Set the URL
         return Ok(json_data);
@@ -118,6 +118,8 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let address = extract_address_from_location(&document);
     let size_living = extract_living_size(&document);
     let size_ground = extract_ground_size(&document);
+    debug_println!("HTML fallback extracted living size: {:?}", size_living);
+    debug_println!("HTML fallback extracted ground size: {:?}", size_ground);
     let coordinates = extract_coordinates_from_map(&body);
     let date = extract_date_from_html(&body);
 
@@ -235,15 +237,9 @@ fn extract_location(document: &Html, url: &str) -> Result<String> {
 }
 
 fn extract_property_type(document: &Html, url: &str) -> PropertyType {
-    // Try to extract from URL first
-    let url_regex = Regex::new(r"/immobilien/([^/]+)/").unwrap();
-    if let Some(captures) = url_regex.captures(url) {
-        if let Some(prop_type) = captures.get(1) {
-            let classified = PropertyType::from_string(prop_type.as_str());
-            if !matches!(classified, PropertyType::Unknown) {
-                return classified;
-            }
-        }
+    // Try to extract from URL first - look at the full path for better classification
+    if let Some(classified) = classify_property_type_from_url(url) {
+        return classified;
     }
 
     // Look for property type in document
@@ -271,88 +267,160 @@ fn extract_property_type(document: &Html, url: &str) -> PropertyType {
     PropertyType::Unknown
 }
 
+/// Enhanced URL-based property type classification for laendleimmo.at URLs
+fn classify_property_type_from_url(url: &str) -> Option<PropertyType> {
+    // Laendleimmo URLs follow pattern: /immobilien/{main_type}/{sub_type}/vorarlberg/{district}/{id}
+    let url_regex = Regex::new(r"/immobilien/([^/]+)/([^/]+)/").unwrap();
+    if let Some(captures) = url_regex.captures(url) {
+        let main_type = captures.get(1)?.as_str().to_lowercase();
+        let sub_type = captures.get(2)?.as_str().to_lowercase();
+        
+        // Combine main and sub type for better classification
+        let combined = format!("{} {}", main_type, sub_type);
+        
+        // Direct mapping for known patterns
+        match main_type.as_str() {
+            "grundstuck" | "grundstueck" => return Some(PropertyType::Land),
+            "wohnung" => return Some(PropertyType::Apartment),
+            "haus" => return Some(PropertyType::House),
+            _ => {}
+        }
+        
+        // Check sub-type patterns for more specific classification
+        if sub_type.contains("grundstuck") || sub_type.contains("grundstueck") || 
+           sub_type.contains("baugrund") || sub_type.contains("bauplatz") {
+            return Some(PropertyType::Land);
+        }
+        
+        if sub_type.contains("wohnung") || sub_type.contains("apartment") {
+            return Some(PropertyType::Apartment);
+        }
+        
+        if sub_type.contains("haus") || sub_type.contains("villa") {
+            return Some(PropertyType::House);
+        }
+        
+        // Fall back to using the existing PropertyType::from_string logic on combined text
+        let classified = PropertyType::from_string(&combined);
+        if !matches!(classified, PropertyType::Unknown) {
+            return Some(classified);
+        }
+    }
+    
+    None
+}
+
 fn extract_living_size(document: &Html) -> Option<String> {
+    // First, try to extract from specific detailed sections
+    let detail_selectors = [
+        "#accordion-collapse",
+        ".object-details",
+        ".object-info", 
+        ".property-details",
+        "#sticky-subheader",
+        ".details",
+    ];
+    
+    for selector_str in &detail_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                let text = element.text().collect::<Vec<_>>().join(" ");
+                if let Some(size) = extract_living_size_from_text(&text) {
+                    debug_println!("Found living size in {}: {}", selector_str, size);
+                    return Some(size);
+                }
+            }
+        }
+    }
+    
+    // Second, try to extract from the full HTML text
+    let full_text = document.root_element().text().collect::<Vec<_>>().join(" ");
+    if let Some(size) = extract_living_size_from_text(&full_text) {
+        debug_println!("Found living size in full text: {}", size);
+        return Some(size);
+    }
+    
+    // Third, try more specific element searches
     let size_selectors = [
-        ".living-area",
-        ".wohnflaeche",
-        "[class*='area']",
-        ".groesse",
+        "div", // General div elements that might contain property details
+        "span", // General span elements
+        "td", // Table cells often contain property details
+        "li", // List items
+        "p", // Paragraphs
     ];
 
     for selector_str in &size_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             for element in document.select(&selector) {
                 let text = element.text().collect::<Vec<_>>().join(" ");
-                // Look for Wohnfläche specifically
-                if (text.to_lowercase().contains("wohnfläche") || text.to_lowercase().contains("wohnflaeche"))
-                    && (text.contains("m²") || text.contains("qm")) {
-                    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
-                    if let Some(captures) = size_regex.captures(&text) {
-                        if let Some(size) = captures.get(1) {
-                            return Some(size.as_str().replace(",", "."));
-                        }
-                    }
+                if let Some(size) = extract_living_size_from_text(&text) {
+                    debug_println!("Found living size in {} element: {}", selector_str, size);
+                    return Some(size);
                 }
             }
         }
     }
 
-    // Fallback: any size that's not ground size
-    for selector_str in &size_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            for element in document.select(&selector) {
-                let text = element.text().collect::<Vec<_>>().join(" ");
-                if (text.contains("m²") || text.contains("qm")) && 
-                   !text.to_lowercase().contains("grundstück") &&
-                   !text.to_lowercase().contains("grund") {
-                    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
-                    if let Some(captures) = size_regex.captures(&text) {
-                        if let Some(size) = captures.get(1) {
-                            return Some(size.as_str().replace(",", "."));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    debug_println!("No living size found in document");
     None
 }
 
 fn extract_ground_size(document: &Html) -> Option<String> {
+    // First, try to extract from specific object-details structure
+    let object_details_selectors = [
+        ".object-details",
+        ".object-info", 
+        ".property-details",
+        "#sticky-subheader",
+        ".details",
+    ];
+    
+    for selector_str in &object_details_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                let text = element.text().collect::<Vec<_>>().join(" ");
+                if let Some(size) = extract_ground_size_from_text(&text) {
+                    debug_println!("Found ground size in {}: {}", selector_str, size);
+                    return Some(size);
+                }
+            }
+        }
+    }
+    
+    // Second, try to extract from the full HTML text for patterns like "Grundstücksgröße 700,00 m²"
+    let full_text = document.root_element().text().collect::<Vec<_>>().join(" ");
+    if let Some(size) = extract_ground_size_from_text(&full_text) {
+        debug_println!("Found ground size in full text: {}", size);
+        return Some(size);
+    }
+    
+    // Third, try more specific element searches
     let size_selectors = [
-        ".plot-area",
-        ".grundstuecksflaeche",
-        ".grundstueck",
-        "[class*='ground']",
-        "[class*='plot']",
-        ".groesse",
+        "div", // General div elements that might contain object details
+        "span", // General span elements
+        "td", // Table cells often contain property details
+        "li", // List items
+        "p", // Paragraphs
     ];
 
     for selector_str in &size_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             for element in document.select(&selector) {
                 let text = element.text().collect::<Vec<_>>().join(" ");
-                // Look for Grundstücksfläche specifically
-                if (text.to_lowercase().contains("grundstück") || 
-                    text.to_lowercase().contains("grundstueck") ||
-                    text.to_lowercase().contains("grund")) &&
-                   (text.contains("m²") || text.contains("qm")) {
-                    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*(?:m²|qm)").unwrap();
-                    if let Some(captures) = size_regex.captures(&text) {
-                        if let Some(size) = captures.get(1) {
-                            return Some(size.as_str().replace(",", "."));
-                        }
-                    }
+                // Use the improved text extraction function
+                if let Some(size) = extract_ground_size_from_text(&text) {
+                    debug_println!("Found ground size in {} element: {}", selector_str, size);
+                    return Some(size);
                 }
             }
         }
     }
 
+    debug_println!("No ground size found in document");
     None
 }
 
-fn extract_from_json_ld(body: &str) -> Result<Property> {
+fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
     // Look for JSON-LD script tag
     let json_start = body
         .find(r#"<script type="application/ld+json">"#)
@@ -389,8 +457,9 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
         .unwrap_or("Unknown")
         .to_string();
 
-    // Extract property type from name using classification
-    let property_type = PropertyType::from_string(name);
+    // Extract property type from URL first, then fall back to name classification
+    let property_type = classify_property_type_from_url(url)
+        .unwrap_or_else(|| PropertyType::from_string(name));
 
     // Extract address
     let street = json["location"]["address"]["streetAddress"]
@@ -424,8 +493,24 @@ fn extract_from_json_ld(body: &str) -> Result<Property> {
 
     // Extract living size and ground size from description
     let description = json["description"].as_str().unwrap_or("");
-    let size_living = extract_living_size_from_text(description);
-    let size_ground = extract_ground_size_from_text(description);
+    let mut size_living = extract_living_size_from_text(description);
+    let mut size_ground = extract_ground_size_from_text(description);
+    
+    // If sizes not found in description, try extracting from full HTML body
+    let document = Html::parse_document(body);
+    
+    if size_living.is_none() {
+        size_living = extract_living_size(&document);
+        debug_println!("Living size not in JSON-LD description, tried HTML extraction: {:?}", size_living);
+    }
+    
+    if size_ground.is_none() {
+        size_ground = extract_ground_size(&document);
+        debug_println!("Ground size not in JSON-LD description, tried HTML extraction: {:?}", size_ground);
+    }
+    
+    debug_println!("JSON-LD description for size extraction: {}", description);
+    debug_println!("JSON-LD extracted living size: {:?}, ground size: {:?}", size_living, size_ground);
 
     // Extract date from datePublished or dateCreated in JSON-LD
     let date = json["datePublished"]
@@ -515,37 +600,108 @@ fn extract_coordinates_from_map(body: &str) -> Option<(f64, f64)> {
 }
 
 fn extract_living_size_from_text(text: &str) -> Option<String> {
-    // Look for Wohnfläche specifically
-    let wohn_regex = Regex::new(r"wohnfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²").unwrap();
-    if let Some(captures) = wohn_regex.captures(&text.to_lowercase()) {
-        if let Some(size) = captures.get(1) {
-            return Some(size.as_str().replace(',', "."));
-        }
-    }
+    // Look for various German living area patterns
+    let patterns = [
+        // Wohnfläche 126,00 m²
+        r"wohnfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // Nutzfläche 126,00 m²
+        r"nutzfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // Living area: 126,00 m²
+        r"living\s*area[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // 126 m² Wohnfläche
+        r"(\d+(?:[.,]\d+)?)\s*m²\s*wohnfl[äa]che",
+        // 126 m² living
+        r"(\d+(?:[.,]\d+)?)\s*m²\s*(?:living|wohn)",
+    ];
     
-    // Fallback: first size that's not explicitly ground
-    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*m²").unwrap();
-    if let Some(captures) = size_regex.captures(text) {
-        let before_match = &text[..captures.get(0).unwrap().start()];
-        // Skip if this looks like ground size
-        if !before_match.to_lowercase().contains("grundstück") && 
-           !before_match.to_lowercase().contains("grund") {
-            if let Some(size) = captures.get(1) {
-                return Some(size.as_str().replace(',', "."));
+    let lower_text = text.to_lowercase();
+    
+    for pattern in &patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            if let Some(captures) = regex.captures(&lower_text) {
+                if let Some(size) = captures.get(1) {
+                    return Some(size.as_str().replace(',', "."));
+                }
             }
         }
     }
+    
+    // Fallback: first size that's not explicitly ground size and not in ground context
+    let size_regex = Regex::new(r"(\d+(?:[.,]\d+)?)\s*m²").unwrap();
+    for captures in size_regex.captures_iter(&lower_text) {
+        if let Some(size_match) = captures.get(0) {
+            let before_match = &lower_text[..size_match.start()];
+            let after_match = &lower_text[size_match.end()..];
+            
+            // Skip if this looks like ground size
+            if before_match.contains("grundstück") || before_match.contains("grundstueck") ||
+               before_match.contains("grund") || after_match.starts_with("grund") ||
+               before_match.contains("parzel") || before_match.contains("bauland") {
+                continue;
+            }
+            
+            // Prefer if it's clearly about living/interior space
+            if before_match.contains("wohn") || before_match.contains("nutz") ||
+               before_match.contains("living") || after_match.starts_with("wohn") {
+                if let Some(size) = captures.get(1) {
+                    return Some(size.as_str().replace(',', "."));
+                }
+            }
+        }
+    }
+    
     None
 }
 
 fn extract_ground_size_from_text(text: &str) -> Option<String> {
-    // Look for Grundstücksfläche specifically
-    let grund_regex = Regex::new(r"grundst[üu]ck(?:sfl[äa]che)?[:\s]*(\d+(?:[.,]\d+)?)\s*m²").unwrap();
-    if let Some(captures) = grund_regex.captures(&text.to_lowercase()) {
-        if let Some(size) = captures.get(1) {
-            return Some(size.as_str().replace(',', "."));
+    // Look for various German ground size patterns, being specific to avoid living area
+    let patterns = [
+        // Grundstücksgröße 700,00 m²
+        r"grundst[üu]cksgr[öo][sß]e[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // Grundstücksfläche 700,00 m²
+        r"grundst[üu]cksfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // Grundstück: 700,00 m²  
+        r"grundst[üu]ck[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        // Mit 700 m² bietet es... (but only if not talking about living area)
+        r"mit\s+(\d+(?:[.,]\d+)?)\s*m²(?!\s*wohnfl[äa]che)",
+        // Plot size, parcel size
+        r"parzellenfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        r"baulandfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+    ];
+    
+    let lower_text = text.to_lowercase();
+    
+    // Skip if this text is clearly about living area, not ground area
+    if lower_text.contains("wohnfläche") || lower_text.contains("wohnflaeche") ||
+       lower_text.contains("nutzfläche") || lower_text.contains("nutzflaeche") {
+        // Only look for ground-specific patterns in mixed content
+        let ground_specific_patterns = [
+            r"grundst[üu]cksgr[öo][sß]e[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+            r"grundst[üu]cksfl[äa]che[:\s]*(\d+(?:[.,]\d+)?)\s*m²",
+        ];
+        
+        for pattern in &ground_specific_patterns {
+            if let Ok(regex) = Regex::new(pattern) {
+                if let Some(captures) = regex.captures(&lower_text) {
+                    if let Some(size) = captures.get(1) {
+                        return Some(size.as_str().replace(',', "."));
+                    }
+                }
+            }
+        }
+        return None;
+    }
+    
+    for pattern in &patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            if let Some(captures) = regex.captures(&lower_text) {
+                if let Some(size) = captures.get(1) {
+                    return Some(size.as_str().replace(',', "."));
+                }
+            }
         }
     }
+    
     None
 }
 
