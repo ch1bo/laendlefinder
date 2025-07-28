@@ -167,6 +167,9 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         tui.add_property(url.clone())?;
     }
 
+    // Show initial progress bar after all properties are added
+    tui.show_initial_progress_bar()?;
+
     // Scrape the selected URLs
     let mut newly_scraped = Vec::new();
     for url in urls_to_scrape.iter() {
@@ -183,7 +186,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         }
 
         // Add a small delay to be respectful to the server
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     // If in refresh mode, remove old versions of the URLs we just scraped
@@ -249,3 +252,4 @@ pub fn merge_properties_with_refresh(
     // Deduplicate by URL (keep the last occurrence to preserve refreshed data)
     deduplicate_properties_by_url(existing_properties)
 }
+
