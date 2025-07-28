@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options};
+use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options, scrape_single_url};
 use laendlefinder::scrapers::{VolScraper, LaendleimmoScraper};
 use laendlefinder::debug;
 
@@ -38,6 +38,10 @@ struct Args {
     /// Enable debug output
     #[clap(short, long)]
     debug: bool,
+    
+    /// Scrape a specific URL and update only that entry in the database
+    #[clap(short = 'u', long)]
+    url: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -60,6 +64,29 @@ fn main() -> Result<()> {
         cookies: args.cookies.clone(),
         debug: args.debug,
     };
+    
+    // If a specific URL is provided, scrape only that URL
+    if let Some(url) = args.url {
+        if !args.debug {
+            println!("Scraping specific URL: {}", url);
+        }
+        
+        // Determine which scraper to use based on the URL domain
+        if url.contains("vol.at") {
+            let vol_scraper = VolScraper;
+            scrape_single_url(&vol_scraper, &url, &options)?;
+        } else if url.contains("laendleimmo.at") {
+            let laendleimmo_scraper = LaendleimmoScraper;
+            scrape_single_url(&laendleimmo_scraper, &url, &options)?;
+        } else {
+            return Err(anyhow::anyhow!("Unsupported URL domain. Only vol.at and laendleimmo.at are supported."));
+        }
+        
+        if !args.debug {
+            println!("URL scraping completed. Results saved to: {}", args.output);
+        }
+        return Ok(());
+    }
     
     // Run vol.at scraper (sold properties)
     if !args.skip_vol {

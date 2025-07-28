@@ -39,6 +39,55 @@ pub trait PlatformScraper {
 /// 2. Find listings according to parameters  
 /// 3. Skip if already known or refresh when option is set
 /// 4. Finally backup properties.csv and write a new CSV with all known properties (deduplicated by URL)
+/// Scrape a specific URL and update only that entry in the database
+pub fn scrape_single_url<T: PlatformScraper>(
+    scraper: &T, 
+    url: &str,
+    options: &ScrapingOptions,
+) -> Result<()> {
+    // Set global debug flag
+    debug::set_debug(options.debug);
+    
+    let mut tui = ScraperTUI::new();
+    
+    // 1. Load all existing properties
+    let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
+    tui.show_summary(all_properties.len())?;
+    
+    // 2. Remove existing entry with the same URL if it exists
+    let existing_count = all_properties.len();
+    all_properties.retain(|p| p.url != url);
+    let removed_count = existing_count - all_properties.len();
+    
+    if removed_count > 0 {
+        println!("Removed {} existing entry for URL: {}", removed_count, url);
+    }
+    
+    // 3. Scrape the specific URL
+    tui.add_property(url.to_string())?;
+    tui.start_scraping_property(url)?;
+    
+    match scraper.scrape_property(url, options.cookies.as_deref()) {
+        Ok(property) => {
+            all_properties.push(property);
+            tui.complete_property(url)?;
+            println!("Successfully scraped and updated: {}", url);
+        },
+        Err(e) => {
+            tui.fail_property(url)?;
+            return Err(anyhow::anyhow!("Failed to scrape URL {}: {}", url, e));
+        }
+    }
+    
+    // 4. Save updated properties to CSV
+    utils::save_properties_to_csv(&all_properties, &options.output_file)?;
+    
+    // Show final summary
+    tui.show_final_summary(1, all_properties.len())?;
+    
+    Ok(())
+}
+
 pub fn run_scraper_with_options<T: PlatformScraper>(
     scraper: &T,
     options: &ScrapingOptions,
