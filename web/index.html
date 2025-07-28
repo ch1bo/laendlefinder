@@ -939,8 +939,15 @@
                 
                 // Add click handler for highlighting
                 propertyDiv.addEventListener('click', (e) => {
-                    highlightProperty(property);
-                    highlightMarker(property);
+                    // Check if this property is already highlighted
+                    if (propertyDiv.classList.contains('highlighted')) {
+                        // If already highlighted, close the panel
+                        closeSidebar();
+                    } else {
+                        // If not highlighted, highlight it
+                        highlightProperty(property);
+                        highlightMarker(property);
+                    }
                 });
                 
                 propertyElements.push(propertyDiv);
