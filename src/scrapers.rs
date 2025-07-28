@@ -1,21 +1,26 @@
 use crate::common_scraper::PlatformScraper;
-use crate::models::{Property, ListingType};
+use crate::models::{ListingType, Property};
 use crate::tui::ScraperTUI;
-use crate::{scraper, laendleimmo_scraper};
+use crate::{laendleimmo_scraper, scraper};
 use anyhow::Result;
 
 pub struct VolScraper;
 
 impl PlatformScraper for VolScraper {
-    fn name(&self) -> &str {
-        "Vol.at"
+    fn base_url(&self) -> &str {
+        "vol.at"
     }
-    
-    fn scrape_listings(&self, max_pages: usize, tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+
+    fn scrape_listings(
+        &self,
+        max_pages: usize,
+        tui: Option<&mut ScraperTUI>,
+    ) -> Result<Vec<String>> {
         scraper::scrape_all_index_pages(max_pages, tui)
     }
-    
+
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property> {
+        check_url(self, url)?;
         scraper::scrape_property_page(url, cookies, ListingType::Sold)
     }
 }
@@ -23,15 +28,30 @@ impl PlatformScraper for VolScraper {
 pub struct LaendleimmoScraper;
 
 impl PlatformScraper for LaendleimmoScraper {
-    fn name(&self) -> &str {
-        "Laendleimmo.at"
+    fn base_url(&self) -> &str {
+        "laendleimmo.at"
     }
-    
-    fn scrape_listings(&self, max_pages: usize, tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+
+    fn scrape_listings(
+        &self,
+        max_pages: usize,
+        tui: Option<&mut ScraperTUI>,
+    ) -> Result<Vec<String>> {
         laendleimmo_scraper::scrape_all_listing_pages(max_pages, tui)
     }
-    
+
     fn scrape_property(&self, url: &str, _cookies: Option<&str>) -> Result<Property> {
+        check_url(self, url)?;
         laendleimmo_scraper::scrape_property_page(url)
     }
+}
+
+fn check_url<S: PlatformScraper>(scraper: &S, url: &str) -> Result<()> {
+    if !url.contains(scraper.base_url()) {
+        return Err(anyhow::anyhow!(
+            "URL does not match the base URL of the scraper: {}",
+            scraper.base_url()
+        ));
+    }
+    Ok(())
 }
