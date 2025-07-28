@@ -46,12 +46,14 @@
             transform: translateX(100%);
         }
         
-        /* Sidebar toggle button */
-        .sidebar-toggle {
-            position: absolute;
-            top: 10px;
-            right: 410px;
-            z-index: 1001;
+        /* Sidebar header with close button */
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+        }
+        .close-button {
             background: white;
             border: 2px solid rgba(0,0,0,0.2);
             border-radius: 4px;
@@ -61,23 +63,20 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
-            font-size: 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            font-size: 16px;
             font-weight: bold;
             color: #333;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
-        .sidebar-toggle.collapsed {
-            right: 10px;
-        }
-        .sidebar-toggle:hover {
+        .close-button:hover {
             background: #f4f4f4;
         }
         
         /* Responsive design */
         @media (max-width: 768px) {
             #map {
-                height: 60vh !important;
+                height: 100vh !important;
                 width: 100% !important;
                 right: 0 !important;
                 position: absolute;
@@ -87,69 +86,86 @@
             }
             #sidebar {
                 position: fixed;
-                top: 60vh;
+                top: 0;
                 left: 0;
                 right: 0;
                 width: 100%;
                 max-width: none;
                 min-width: none;
-                height: 40vh;
+                height: 100vh;
                 border-left: none;
-                border-top: 1px solid #dee2e6;
+                border-top: none;
+                transform: translateY(100%);
+                transition: transform 0.3s ease;
+                z-index: 1000;
+                background-color: rgba(248, 249, 250, 0.95);
+                backdrop-filter: blur(10px);
+            }
+            #sidebar:not(.collapsed) {
                 transform: translateY(0);
             }
             #sidebar.collapsed {
                 transform: translateY(100%);
             }
-            .sidebar-toggle {
-                top: calc(60vh - 35px);
-                left: 50%;
-                right: auto;
-                transform: translateX(-50%);
-                width: 60px;
-                height: 35px;
-                border-radius: 15px 15px 0 0;
+            .list-toggle {
+                position: fixed;
+                top: 10px;
+                right: 50px;
+                left: auto;
+                bottom: auto;
+                transform: none;
+                width: 30px;
+                height: 30px;
+                border-radius: 4px;
                 font-size: 16px;
+                z-index: 1002;
+                opacity: 1;
+                visibility: visible;
+            }
+            .list-toggle.collapsed {
+                top: 10px;
+                right: 50px;
+                left: auto;
+                bottom: auto;
+                opacity: 1;
+                visibility: visible;
+            }
+            .filter-toggle {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                left: auto;
+                bottom: auto;
+                transform: none;
+                width: 30px;
+                height: 30px;
+                border-radius: 4px;
+                font-size: 16px;
+                z-index: 1002;
+                opacity: 1;
+                visibility: visible;
+            }
+            .filter-toggle.collapsed {
+                top: 10px;
+                right: 10px;
+                left: auto;
+                bottom: auto;
+                opacity: 1;
+                visibility: visible;
             }
         }
         
         @media (max-width: 480px) {
-            #map {
-                height: 70vh !important;
-            }
-            #sidebar {
-                top: 70vh;
-                height: 30vh;
-            }
-            .sidebar-toggle {
-                top: calc(70vh - 35px);
-                height: 35px;
-            }
-        }
-        .reset-button {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85em;
-            font-weight: 500;
-            z-index: 10;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            /* No additional changes needed - sidebar uses full overlay */
         }
         .reset-button:hover {
             background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         .reset-button:active {
             transform: translateY(0);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         #property-list {
             flex: 1;
@@ -159,7 +175,7 @@
         .property-item {
             background-color: white;
             margin-bottom: 10px;
-            padding: 15px;
+            padding: 12px;
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             border-left: 4px solid #ddd;
@@ -179,10 +195,18 @@
             border-color: #ffc107;
             box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
         }
+        .property-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            gap: 10px;
+        }
         .property-title {
             font-weight: bold;
-            margin-bottom: 5px;
             color: #333;
+            flex: 1;
+            margin: 0;
         }
         .property-price {
             color: #2c8a2c;
@@ -230,20 +254,121 @@
             padding: 20px;
             color: #666;
         }
-        .filter-panel {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        .panel-toggle {
+            position: absolute;
+            top: 10px;
+            z-index: 1001;
+            background: white;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+        .panel-toggle.collapsed {
+            opacity: 1;
+            visibility: visible;
+        }
+        .panel-toggle:hover {
+            background: #f4f4f4;
+        }
+        
+        .list-toggle.collapsed {
+            right: 50px;
+            top: 10px;
+        }
+        
+        .filter-toggle.collapsed {
+            right: 10px;
+            top: 10px;
+        }
+        
+        .panel-header {
+            display: flex;
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+            flex: 1;
+            margin-right: 8px;
+        }
+        .panel-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.2s ease;
+        }
+        .panel-tab.active {
+            background: white;
+            color: #2c3e50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .panel-tab:hover:not(.active) {
+            background: rgba(255,255,255,0.7);
+            color: #495057;
+        }
+        
+        .panel {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .panel.active {
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+        }
+        
+        .filter-content {
             padding: 16px;
             margin: 8px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             border: 1px solid rgba(0,0,0,0.05);
         }
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
         .filter-title {
             font-weight: 600;
-            margin-bottom: 12px;
             color: #2c3e50;
             font-size: 1em;
             letter-spacing: -0.02em;
+            margin: 0;
+        }
+        .reset-button {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .filter-group {
             margin-bottom: 14px;
@@ -337,13 +462,36 @@
         }
         .lean-popup {
             background-color: white;
-            padding: 8px 10px;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            border: 1px solid #ccc;
-            font-size: 0.85em;
-            line-height: 1.3;
-            max-width: 200px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            border: 2px solid #007bff;
+            font-size: 0.9em;
+            line-height: 1.4;
+            max-width: 220px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+            -webkit-tap-highlight-color: transparent;
+            pointer-events: auto;
+        }
+        .lean-popup:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.2);
+        }
+        .lean-popup:active {
+            transform: scale(0.95) translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .lean-popup {
+                padding: 14px 16px;
+                border-radius: 12px;
+                font-size: 1em;
+                max-width: 240px;
+            }
         }
         .lean-popup .popup-price {
             font-weight: bold;
@@ -357,6 +505,13 @@
         .lean-popup .popup-type {
             color: #666;
             font-size: 0.8em;
+        }
+        .popup-tap-hint {
+            color: #007bff;
+            font-size: 0.75em;
+            font-style: italic;
+            margin-top: 4px;
+            text-align: center;
         }
         .info-listing-type {
             color: #666;
@@ -374,23 +529,26 @@
             background-color: #f5e8e8;
             color: #5f2c2c;
         }
-        .visit-button {
+        .details-button {
             background-color: #007bff;
             color: white;
             border: none;
-            padding: 8px 12px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9em;
-            margin-top: 10px;
-            transition: background-color 0.3s;
+            font-size: 0.8em;
+            transition: all 0.2s ease;
             text-decoration: none;
             display: inline-block;
+            flex-shrink: 0;
+            line-height: 1.2;
         }
-        .visit-button:hover {
+        .details-button:hover {
             background-color: #0056b3;
             color: white;
             text-decoration: none;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,123,255,0.3);
         }
         .marker-highlighted div {
             background-color: #ffc107 !important;
@@ -403,50 +561,64 @@
     </style>
 </head>
 <body>
-    <div class="sidebar-toggle" onclick="toggleSidebar()">✕</div>
-    <div id="map" class="sidebar-open"></div>
-    <div id="sidebar">
-        <button class="reset-button" onclick="resetView()">Reset View</button>
-        <div class="filter-panel">
-            <div class="filter-title">Filters</div>
-            <div class="filter-group">
-                <label>
-                    <input type="checkbox" id="filter-available" checked> 
-                    <span id="available-label">Available Properties</span>
-                    <span id="available-count" class="filter-count"></span>
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-sold" checked> 
-                    <span id="sold-label">Sold Properties</span>
-                    <span id="sold-count" class="filter-count"></span>
-                </label>
+    <div class="list-toggle panel-toggle collapsed" onclick="toggleListPanel()">≡</div>
+    <div class="filter-toggle panel-toggle collapsed" onclick="toggleFilterPanel()">⚙</div>
+    <div id="map"></div>
+    <div id="sidebar" class="collapsed">
+        <div class="sidebar-header">
+            <div class="panel-header">
+                <button class="panel-tab active" id="list-tab" onclick="showPanel('list')">Properties</button>
+                <button class="panel-tab" id="filter-tab" onclick="showPanel('filter')">Filters</button>
             </div>
-            <div class="filter-group">
-                <div class="filter-title" style="font-size: 0.9em; margin-bottom: 8px;">Property Types</div>
-                <label>
-                    <input type="checkbox" id="filter-apartment" checked> 
-                    <span>Wohnung</span>
-                    <span id="apartment-count" class="filter-count"></span>
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-house" checked> 
-                    <span>Haus</span>
-                    <span id="house-count" class="filter-count"></span>
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-land" checked> 
-                    <span>Grundstück</span>
-                    <span id="land-count" class="filter-count"></span>
-                </label>
-                <label>
-                    <input type="checkbox" id="filter-unknown" checked> 
-                    <span>Unbekannt</span>
-                    <span id="unknown-count" class="filter-count"></span>
-                </label>
+            <button class="close-button" onclick="closeSidebar()">✕</button>
+        </div>
+        <div id="property-panel" class="panel active">
+            <div id="property-list">
+                <div id="loading" class="loading">Loading property data...</div>
             </div>
         </div>
-        <div id="property-list">
-            <div id="loading" class="loading">Loading property data...</div>
+        <div id="filter-panel" class="panel">
+            <div class="filter-content">
+                <div class="filter-header">
+                    <div class="filter-title">Filters</div>
+                    <button class="reset-button" onclick="resetView()">Reset</button>
+                </div>
+                <div class="filter-group">
+                    <label>
+                        <input type="checkbox" id="filter-available" checked> 
+                        <span id="available-label">Available Properties</span>
+                        <span id="available-count" class="filter-count"></span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-sold" checked> 
+                        <span id="sold-label">Sold Properties</span>
+                        <span id="sold-count" class="filter-count"></span>
+                    </label>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-title" style="font-size: 0.9em; margin-bottom: 8px;">Property Types</div>
+                    <label>
+                        <input type="checkbox" id="filter-apartment" checked> 
+                        <span>Wohnung</span>
+                        <span id="apartment-count" class="filter-count"></span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-house" checked> 
+                        <span>Haus</span>
+                        <span id="house-count" class="filter-count"></span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-land" checked> 
+                        <span>Grundstück</span>
+                        <span id="land-count" class="filter-count"></span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="filter-unknown" checked> 
+                        <span>Unbekannt</span>
+                        <span id="unknown-count" class="filter-count"></span>
+                    </label>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -542,19 +714,88 @@
                     // Store property reference with marker
                     marker.propertyData = property;
                     
-                    // Add click handler for marker highlighting
+                    // Add click handler for marker highlighting (same behavior for all devices)
                     marker.on('click', function() {
                         highlightProperty(property);
                         highlightMarker(property);
                     });
                     
-                    // Add hover popup
+                    // Add interactive popup
                     const leanPopupContent = createLeanPopupContent(property);
                     marker.bindTooltip(leanPopupContent, {
                         permanent: false,
                         direction: 'top',
                         offset: [0, -10],
-                        className: 'lean-popup'
+                        className: 'lean-popup',
+                        interactive: true
+                    });
+                    
+                    // Add click event to tooltip when it opens
+                    marker.on('tooltipopen', function(e) {
+                        const tooltipEl = e.tooltip.getElement();
+                        if (tooltipEl) {
+                            tooltipEl.style.cursor = 'pointer';
+                            
+                            // Add multiple event listeners for better mobile compatibility
+                            let touchStartTime = 0;
+                            let touchStartPos = { x: 0, y: 0 };
+                            
+                            const handleTouchStart = function(event) {
+                                touchStartTime = Date.now();
+                                const touch = event.touches[0];
+                                touchStartPos = { x: touch.clientX, y: touch.clientY };
+                            };
+                            
+                            const handleTouchEnd = function(event) {
+                                const touchDuration = Date.now() - touchStartTime;
+                                const touch = event.changedTouches[0];
+                                const touchEndPos = { x: touch.clientX, y: touch.clientY };
+                                const distance = Math.sqrt(
+                                    Math.pow(touchEndPos.x - touchStartPos.x, 2) + 
+                                    Math.pow(touchEndPos.y - touchStartPos.y, 2)
+                                );
+                                
+                                // Only treat as tap if it's quick and didn't move much
+                                if (touchDuration < 300 && distance < 10) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openListPanelWithProperty(property);
+                                }
+                            };
+                            
+                            const handleClick = function(event) {
+                                event.stopPropagation();
+                                openListPanelWithProperty(property);
+                            };
+                            
+                            tooltipEl.addEventListener('click', handleClick);
+                            tooltipEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+                            tooltipEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+                            
+                            // Store the handlers for cleanup
+                            tooltipEl._clickHandler = handleClick;
+                            tooltipEl._touchStartHandler = handleTouchStart;
+                            tooltipEl._touchEndHandler = handleTouchEnd;
+                        }
+                    });
+                    
+                    // Clean up event listeners when tooltip closes
+                    marker.on('tooltipclose', function(e) {
+                        const tooltipEl = e.tooltip.getElement();
+                        if (tooltipEl) {
+                            if (tooltipEl._clickHandler) {
+                                tooltipEl.removeEventListener('click', tooltipEl._clickHandler);
+                                delete tooltipEl._clickHandler;
+                            }
+                            if (tooltipEl._touchStartHandler) {
+                                tooltipEl.removeEventListener('touchstart', tooltipEl._touchStartHandler);
+                                delete tooltipEl._touchStartHandler;
+                            }
+                            if (tooltipEl._touchEndHandler) {
+                                tooltipEl.removeEventListener('touchend', tooltipEl._touchEndHandler);
+                                delete tooltipEl._touchEndHandler;
+                            }
+                        }
                     });
                     
                     // Store marker for filtering
@@ -571,6 +812,7 @@
                 <div class="popup-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
                 <div class="popup-location">${property.location}</div>
                 <div class="popup-type">${formatPropertyType(property.property_type)}</div>
+                <div class="popup-tap-hint">Click to view details</div>
             `;
         }
 
@@ -678,7 +920,12 @@
                 propertyDiv.propertyData = property; // Store property reference
                 
                 propertyDiv.innerHTML = `
-                    <div class="property-title">${property.location} - ${formatPropertyType(property.property_type)}</div>
+                    <div class="property-header">
+                        <div class="property-title">${property.location} - ${formatPropertyType(property.property_type)}</div>
+                        <a href="${property.url}" target="_blank" class="details-button" onclick="event.stopPropagation();">
+                            Details
+                        </a>
+                    </div>
                     <div class="property-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
                     <div class="property-location">${property.address || property.location}</div>
                     <div class="property-stats">
@@ -688,9 +935,6 @@
                         ${property.size_living ? `<span>${property.size_living} m²</span>` : ''}
                         ${property.date ? `<span>${property.date}</span>` : ''}
                     </div>
-                    <a href="${property.url}" target="_blank" class="visit-button" onclick="event.stopPropagation();">
-                        Visit Property Page
-                    </a>
                 `;
                 
                 // Add click handler for highlighting
@@ -807,6 +1051,7 @@
             clearHighlights();
             map.setView([47.2499, 9.9809], 10); // Reset to initial Vorarlberg view
             applyFilters(); // Refresh the display
+            closeSidebar(); // Close the panel after reset
         }
 
         // Function to highlight a property in the list when its marker is clicked
@@ -825,6 +1070,11 @@
                 'Living Size': property.size_living,
                 'Ground Size': property.size_ground
             });
+            
+            // On desktop, auto-switch to list view when sidebar is open
+            if (window.innerWidth > 768 && !sidebarCollapsed) {
+                showPanel('list');
+            }
             
             // Clear previous property highlighting
             if (currentHighlightedProperty) {
@@ -918,31 +1168,92 @@
         });
 
         // Sidebar toggle functionality
-        let sidebarCollapsed = false;
+        let sidebarCollapsed = true;
         
-        function toggleSidebar() {
+        function openSidebar() {
             const sidebar = document.getElementById('sidebar');
             const mapElement = document.getElementById('map');
-            const toggleButton = document.querySelector('.sidebar-toggle');
+            const listToggle = document.querySelector('.list-toggle');
+            const filterToggle = document.querySelector('.filter-toggle');
             
-            sidebarCollapsed = !sidebarCollapsed;
-            
-            if (sidebarCollapsed) {
-                sidebar.classList.add('collapsed');
-                mapElement.classList.remove('sidebar-open');
-                toggleButton.classList.add('collapsed');
-                toggleButton.innerHTML = '☰';
-            } else {
-                sidebar.classList.remove('collapsed');
-                mapElement.classList.add('sidebar-open');
-                toggleButton.classList.remove('collapsed');
-                toggleButton.innerHTML = '✕';
-            }
+            sidebarCollapsed = false;
+            sidebar.classList.remove('collapsed');
+            mapElement.classList.add('sidebar-open');
+            listToggle.classList.remove('collapsed');
+            filterToggle.classList.remove('collapsed');
             
             // Trigger map resize after animation completes
             setTimeout(() => {
                 map.invalidateSize();
-            }, 300);
+            }, 350);
+        }
+        
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mapElement = document.getElementById('map');
+            const listToggle = document.querySelector('.list-toggle');
+            const filterToggle = document.querySelector('.filter-toggle');
+            
+            sidebarCollapsed = true;
+            sidebar.classList.add('collapsed');
+            mapElement.classList.remove('sidebar-open');
+            listToggle.classList.add('collapsed');
+            filterToggle.classList.add('collapsed');
+            
+            // Trigger map resize after animation completes
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 350);
+        }
+        
+        // Panel switching functionality
+        function showPanel(panelType) {
+            const listTab = document.getElementById('list-tab');
+            const filterTab = document.getElementById('filter-tab');
+            const propertyPanel = document.getElementById('property-panel');
+            const filterPanel = document.getElementById('filter-panel');
+            
+            if (panelType === 'list') {
+                listTab.classList.add('active');
+                filterTab.classList.remove('active');
+                propertyPanel.classList.add('active');
+                filterPanel.classList.remove('active');
+            } else if (panelType === 'filter') {
+                listTab.classList.remove('active');
+                filterTab.classList.add('active');
+                propertyPanel.classList.remove('active');
+                filterPanel.classList.add('active');
+            }
+        }
+        
+        // List toggle functionality (quick access to properties list)
+        function toggleListPanel() {
+            if (sidebarCollapsed) {
+                openSidebar();
+            }
+            showPanel('list');
+        }
+        
+        // Filter toggle functionality (quick access to filter panel)
+        function toggleFilterPanel() {
+            if (sidebarCollapsed) {
+                openSidebar();
+            }
+            showPanel('filter');
+        }
+        
+        // Open list panel with specific property highlighted (for mobile popup tap)
+        function openListPanelWithProperty(property) {
+            if (sidebarCollapsed) {
+                openSidebar();
+            }
+            showPanel('list');
+            
+            // Highlight the property after a short delay to ensure panel is open
+            setTimeout(() => {
+                highlightProperty(property);
+                highlightMarker(property);
+            }, 100);
         }
 
         // Add automatic filter event listeners
