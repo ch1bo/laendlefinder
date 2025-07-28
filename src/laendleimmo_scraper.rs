@@ -312,50 +312,18 @@ fn classify_property_type_from_url(url: &str) -> Option<PropertyType> {
 }
 
 fn extract_living_size(document: &Html) -> Option<String> {
-    // First, try to extract from specific detailed sections
-    let detail_selectors = [
+    // Limit search to only the most relevant sections for performance
+    let specific_selectors = [
         "#accordion-collapse",
-        ".object-details",
-        ".object-info", 
-        ".property-details",
         "#sticky-subheader",
-        ".details",
     ];
     
-    for selector_str in &detail_selectors {
+    for selector_str in &specific_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             for element in document.select(&selector) {
                 let text = element.text().collect::<Vec<_>>().join(" ");
                 if let Some(size) = extract_living_size_from_text(&text) {
                     debug_println!("Found living size in {}: {}", selector_str, size);
-                    return Some(size);
-                }
-            }
-        }
-    }
-    
-    // Second, try to extract from the full HTML text
-    let full_text = document.root_element().text().collect::<Vec<_>>().join(" ");
-    if let Some(size) = extract_living_size_from_text(&full_text) {
-        debug_println!("Found living size in full text: {}", size);
-        return Some(size);
-    }
-    
-    // Third, try more specific element searches
-    let size_selectors = [
-        "div", // General div elements that might contain property details
-        "span", // General span elements
-        "td", // Table cells often contain property details
-        "li", // List items
-        "p", // Paragraphs
-    ];
-
-    for selector_str in &size_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            for element in document.select(&selector) {
-                let text = element.text().collect::<Vec<_>>().join(" ");
-                if let Some(size) = extract_living_size_from_text(&text) {
-                    debug_println!("Found living size in {} element: {}", selector_str, size);
                     return Some(size);
                 }
             }
@@ -367,50 +335,18 @@ fn extract_living_size(document: &Html) -> Option<String> {
 }
 
 fn extract_ground_size(document: &Html) -> Option<String> {
-    // First, try to extract from specific object-details structure
-    let object_details_selectors = [
-        ".object-details",
-        ".object-info", 
-        ".property-details",
+    // Limit search to only the most relevant sections for performance
+    let specific_selectors = [
         "#sticky-subheader",
-        ".details",
+        "#accordion-collapse",
     ];
     
-    for selector_str in &object_details_selectors {
+    for selector_str in &specific_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             for element in document.select(&selector) {
                 let text = element.text().collect::<Vec<_>>().join(" ");
                 if let Some(size) = extract_ground_size_from_text(&text) {
                     debug_println!("Found ground size in {}: {}", selector_str, size);
-                    return Some(size);
-                }
-            }
-        }
-    }
-    
-    // Second, try to extract from the full HTML text for patterns like "Grundstücksgröße 700,00 m²"
-    let full_text = document.root_element().text().collect::<Vec<_>>().join(" ");
-    if let Some(size) = extract_ground_size_from_text(&full_text) {
-        debug_println!("Found ground size in full text: {}", size);
-        return Some(size);
-    }
-    
-    // Third, try more specific element searches
-    let size_selectors = [
-        "div", // General div elements that might contain object details
-        "span", // General span elements
-        "td", // Table cells often contain property details
-        "li", // List items
-        "p", // Paragraphs
-    ];
-
-    for selector_str in &size_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            for element in document.select(&selector) {
-                let text = element.text().collect::<Vec<_>>().join(" ");
-                // Use the improved text extraction function
-                if let Some(size) = extract_ground_size_from_text(&text) {
-                    debug_println!("Found ground size in {} element: {}", selector_str, size);
                     return Some(size);
                 }
             }
@@ -498,16 +434,18 @@ fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
     let mut size_ground = extract_ground_size_from_text(description);
     
     // If sizes not found in description, try extracting from full HTML body
-    let document = Html::parse_document(body);
-    
-    if size_living.is_none() {
-        size_living = extract_living_size(&document);
-        debug_println!("Living size not in JSON-LD description, tried HTML extraction: {:?}", size_living);
-    }
-    
-    if size_ground.is_none() {
-        size_ground = extract_ground_size(&document);
-        debug_println!("Ground size not in JSON-LD description, tried HTML extraction: {:?}", size_ground);
+    if size_living.is_none() || size_ground.is_none() {
+        let document = Html::parse_document(body);
+        
+        if size_living.is_none() {
+            size_living = extract_living_size(&document);
+            debug_println!("Living size not in JSON-LD description, tried HTML extraction: {:?}", size_living);
+        }
+        
+        if size_ground.is_none() {
+            size_ground = extract_ground_size(&document);
+            debug_println!("Ground size not in JSON-LD description, tried HTML extraction: {:?}", size_ground);
+        }
     }
     
     debug_println!("JSON-LD description for size extraction: {}", description);
