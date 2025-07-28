@@ -111,7 +111,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
 
     // Fallback to HTML parsing
     debug_println!("JSON-LD extraction failed, falling back to HTML parsing");
-    let title = extract_title(&document)?;
+    let name = extract_title(&document)?;
     let price = extract_price(&document)?;
     let location = extract_location(&document, url)?;
     let property_type = extract_property_type(&document, url);
@@ -124,12 +124,13 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let date = extract_date_from_html(&body);
 
     debug_println!(
-        "Extracted data: price={}, location={}, type={}, title={}, date={:?}",
-        price, location, property_type, title, date
+        "Extracted data: price={}, location={}, type={}, name={}, date={:?}",
+        price, location, property_type, name, date
     );
 
     Ok(Property {
         url: url.to_string(),
+        name,
         price,
         location,
         property_type,
@@ -526,6 +527,7 @@ fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
 
     Ok(Property {
         url: "".to_string(), // Will be set by caller
+        name: name.to_string(),
         price,
         location,
         property_type,

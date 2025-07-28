@@ -131,6 +131,7 @@ impl PropertyType {
 #[derive(Debug, Clone)]
 pub struct Property {
     pub url: String,
+    pub name: String,
     pub price: String,
     pub location: String,
     pub property_type: PropertyType,
@@ -148,8 +149,9 @@ impl Serialize for Property {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Property", 10)?;
+        let mut state = serializer.serialize_struct("Property", 11)?;
         state.serialize_field("url", &self.url)?;
+        state.serialize_field("name", &self.name)?;
         state.serialize_field("price", &self.price)?;
         state.serialize_field("location", &self.location)?;
         state.serialize_field("property_type", &self.property_type)?;
@@ -180,6 +182,8 @@ impl<'de> Deserialize<'de> for Property {
         #[derive(Deserialize)]
         struct PropertyHelper {
             url: String,
+            #[serde(default)]
+            name: String,
             price: String,
             location: String,
             property_type: PropertyType,
@@ -210,6 +214,7 @@ impl<'de> Deserialize<'de> for Property {
 
         Ok(Property {
             url: helper.url,
+            name: helper.name,
             price: helper.price,
             location: helper.location,
             property_type: helper.property_type,

@@ -843,7 +843,7 @@
         function createLeanPopupContent(property) {
             return `
                 <div class="popup-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
-                <div class="popup-location">${property.location}</div>
+                <div class="popup-location">${property.name || property.location}</div>
                 <div class="popup-type">${formatPropertyType(property.property_type)}</div>
                 <div class="popup-tap-hint">Click to view details</div>
             `;
@@ -857,7 +857,7 @@
             // Title
             const title = document.createElement('div');
             title.className = 'info-title';
-            title.textContent = `${property.location} - ${formatPropertyType(property.property_type)}`;
+            title.textContent = property.name || `${property.location} - ${formatPropertyType(property.property_type)}`;
             container.appendChild(title);
             
             // Listing Type
@@ -954,7 +954,7 @@
                 
                 propertyDiv.innerHTML = `
                     <div class="property-header">
-                        <div class="property-title">${property.location} - ${formatPropertyType(property.property_type)}</div>
+                        <div class="property-title">${property.name || `${property.location} - ${formatPropertyType(property.property_type)}`}</div>
                         <a href="${property.url}" target="_blank" class="details-button" onclick="event.stopPropagation();">
                             Details
                         </a>
@@ -1099,19 +1099,7 @@
         // Function to highlight a property in the list when its marker is clicked
         function highlightProperty(property) {
             // Log property data to console
-            console.log('Property highlighted:', property);
-            console.table({
-                'URL': property.url,
-                'Price': property.price,
-                'Location': property.location,
-                'Property Type': formatPropertyType(property.property_type),
-                'Listing Type': property.listing_type,
-                'Date': property.date,
-                'Coordinates': property.coordinates,
-                'Address': property.address,
-                'Living Size': property.size_living,
-                'Ground Size': property.size_ground
-            });
+            console.table(property);
             
             // On desktop, auto-switch to list view when sidebar is open
             if (window.innerWidth > 768 && !sidebarCollapsed) {
