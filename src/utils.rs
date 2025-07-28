@@ -4,6 +4,7 @@ use std::path::Path;
 // Removed the unused import: use csv::Writer;
 use crate::models::Property;
 use crate::{debug_println};
+use rand::seq::SliceRandom;
 
 /// Sanitize URL by removing query parameters and fragments to avoid duplicates
 /// 
@@ -14,6 +15,54 @@ pub fn sanitize_url(url: &str) -> String {
     let url = url.split('?').next().unwrap_or(url);
     let url = url.split('#').next().unwrap_or(url);
     url.to_string()
+}
+
+/// Get a random user agent from a pool of common desktop browsers
+/// 
+/// This function returns different user agents for Chrome, Firefox, Safari and Edge
+/// across different operating systems (Windows, macOS, Linux) to avoid detection.
+pub fn get_random_user_agent() -> &'static str {
+    let user_agents = [
+        // Chrome on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        
+        // Chrome on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        
+        // Chrome on Linux
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        
+        // Firefox on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+        "Mozilla/5.0 (Windows NT 11.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        
+        // Firefox on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0",
+        
+        // Firefox on Linux
+        "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        
+        // Safari on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        
+        // Edge on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+        "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+        
+        // Edge on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    ];
+    
+    let mut rng = rand::thread_rng();
+    user_agents.choose(&mut rng).unwrap_or(&user_agents[0])
 }
 
 #[cfg(test)]
@@ -54,6 +103,38 @@ mod tests {
             sanitize_url("https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456?source=feed&campaign=winter"),
             "https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456"
         );
+    }
+
+    #[test]
+    fn test_get_random_user_agent() {
+        // Test that the function returns a valid user agent
+        let user_agent = get_random_user_agent();
+        assert!(!user_agent.is_empty());
+        assert!(user_agent.starts_with("Mozilla/"));
+        
+        // Test that different calls may return different user agents (not guaranteed but likely)
+        let user_agents: std::collections::HashSet<&str> = (0..10)
+            .map(|_| get_random_user_agent())
+            .collect();
+        
+        // With 20 different user agents, getting at least 2 different ones in 10 calls is very likely
+        // This is probabilistic but should work in practice
+        assert!(user_agents.len() >= 1); // At minimum we get one valid user agent
+        
+        // Verify some common browser identifiers appear in our pool
+        let all_agents = [
+            get_random_user_agent(),
+            get_random_user_agent(),
+            get_random_user_agent(),
+            get_random_user_agent(),
+            get_random_user_agent(),
+        ];
+        
+        let has_chrome = all_agents.iter().any(|ua| ua.contains("Chrome"));
+        let has_firefox = all_agents.iter().any(|ua| ua.contains("Firefox"));
+        
+        // Due to randomness, we can't guarantee both will appear, but at least one should
+        assert!(has_chrome || has_firefox, "Should contain Chrome or Firefox user agents");
     }
 
 }

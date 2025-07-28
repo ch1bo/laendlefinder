@@ -1,6 +1,6 @@
 use crate::models::{ListingType, Property, PropertyType};
 use crate::tui::ScraperTUI;
-use crate::utils::sanitize_url;
+use crate::utils::{sanitize_url, get_random_user_agent};
 use crate::{debug_println, debug_eprintln};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
@@ -56,7 +56,7 @@ pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
 
     let response = reqwest::blocking::Client::new()
         .get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        .header("User-Agent", get_random_user_agent())
         .send()
         .context("Failed to fetch listing page")?;
 
@@ -96,7 +96,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
 
     let response = reqwest::blocking::Client::new()
         .get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        .header("User-Agent", get_random_user_agent())
         .send()
         .context("Failed to fetch property page")?;
 

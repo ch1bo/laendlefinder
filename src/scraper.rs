@@ -1,7 +1,7 @@
 use crate::models::{ListingType, Property, PropertyType};
 use crate::parser;
 use crate::tui::ScraperTUI;
-use crate::utils::sanitize_url;
+use crate::utils::{sanitize_url, get_random_user_agent};
 use crate::{debug_eprintln, debug_println};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
@@ -117,7 +117,7 @@ pub fn scrape_property_page(
     // Build request with optional cookies
     let mut request = reqwest::blocking::Client::new()
         .get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+        .header("User-Agent", get_random_user_agent());
 
     if let Some(cookie_str) = cookies {
         debug_println!("Using cookies: {}", cookie_str);
