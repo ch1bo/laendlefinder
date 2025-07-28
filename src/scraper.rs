@@ -1,6 +1,7 @@
 use crate::models::{ListingType, Property, PropertyType};
 use crate::parser;
 use crate::tui::ScraperTUI;
+use crate::utils::sanitize_url;
 use crate::{debug_eprintln, debug_println};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
@@ -238,7 +239,7 @@ pub fn scrape_property_page(
 
     // Create and return the Property
     Ok(Property {
-        url: url.to_string(),
+        url: sanitize_url(url),
         name: headline,
         price: price.to_string(),
         location,
@@ -358,7 +359,7 @@ fn extract_property_from_json(
 
     // Create and return the Property
     Ok(Property {
-        url: url.to_string(),
+        url: sanitize_url(url),
         name: title.to_string(),
         price: price.unwrap_or("Unknown".to_string()),
         location,

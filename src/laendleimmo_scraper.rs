@@ -1,5 +1,6 @@
 use crate::models::{ListingType, Property, PropertyType};
 use crate::tui::ScraperTUI;
+use crate::utils::sanitize_url;
 use crate::{debug_println, debug_eprintln};
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
@@ -103,9 +104,8 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     let document = Html::parse_document(&body);
 
     // Try to extract from JSON-LD first (most reliable)
-    if let Ok(mut json_data) = extract_from_json_ld(&body, url) {
+    if let Ok(json_data) = extract_from_json_ld(&body, url) {
         debug_println!("Successfully extracted from JSON-LD");
-        json_data.url = url.to_string(); // Set the URL
         return Ok(json_data);
     }
 
@@ -129,7 +129,7 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     );
 
     Ok(Property {
-        url: url.to_string(),
+        url: sanitize_url(url),
         name,
         price,
         location,
@@ -526,7 +526,7 @@ fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
     );
 
     Ok(Property {
-        url: "".to_string(), // Will be set by caller
+        url: sanitize_url(url),
         name: name.to_string(),
         price,
         location,

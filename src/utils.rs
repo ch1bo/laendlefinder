@@ -5,18 +5,59 @@ use std::path::Path;
 use crate::models::Property;
 use crate::{debug_println};
 
-// Since this function is never used, we can either remove it or keep it for future use
-// I'll keep it but add an allow attribute to suppress the warning
-#[allow(dead_code)]
-pub fn compare_properties(existing: &[Property], new: &[Property]) -> Vec<Property> {
-    let existing_urls: std::collections::HashSet<String> =
-        existing.iter().map(|p| p.url.clone()).collect();
-
-    new.iter()
-        .filter(|p| !existing_urls.contains(&p.url))
-        .cloned()
-        .collect()
+/// Sanitize URL by removing query parameters and fragments to avoid duplicates
+/// 
+/// This function removes everything after '?' (query parameters) and '#' (fragments)
+/// to ensure that URLs with different parameters are treated as the same property.
+pub fn sanitize_url(url: &str) -> String {
+    // Find the position of '?' or '#' and take everything before it
+    let url = url.split('?').next().unwrap_or(url);
+    let url = url.split('#').next().unwrap_or(url);
+    url.to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_url() {
+        // Test URL with query parameters
+        assert_eq!(
+            sanitize_url("https://example.com/property/123?utm_source=google&ref=search"),
+            "https://example.com/property/123"
+        );
+
+        // Test URL with fragment
+        assert_eq!(
+            sanitize_url("https://example.com/property/123#details"),
+            "https://example.com/property/123"
+        );
+
+        // Test URL with both query parameters and fragment
+        assert_eq!(
+            sanitize_url("https://example.com/property/123?page=2&sort=price#gallery"),
+            "https://example.com/property/123"
+        );
+
+        // Test URL without query parameters or fragments
+        assert_eq!(
+            sanitize_url("https://example.com/property/123"),
+            "https://example.com/property/123"
+        );
+
+        // Test empty URL
+        assert_eq!(sanitize_url(""), "");
+
+        // Test laendleimmo URL example
+        assert_eq!(
+            sanitize_url("https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456?source=feed&campaign=winter"),
+            "https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456"
+        );
+    }
+
+}
+
 
 pub fn load_properties_from_csv(path: &str) -> Result<Vec<Property>> {
     let path = Path::new(path);
@@ -37,8 +78,10 @@ pub fn load_properties_from_csv(path: &str) -> Result<Vec<Property>> {
     let mut properties = Vec::new();
 
     for result in reader.deserialize() {
-        let property: Property =
+        let mut property: Property =
             result.with_context(|| "Failed to deserialize property from CSV")?;
+        // Sanitize URL to remove query parameters and fragments for deduplication
+        property.url = sanitize_url(&property.url);
         properties.push(property);
     }
 
