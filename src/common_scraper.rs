@@ -66,6 +66,8 @@ pub fn scrape_single_url<T: PlatformScraper>(
     tui.add_property(url.to_string())?;
     tui.start_scraping_property(url)?;
 
+    let mut failed_urls = Vec::new();
+    
     match scraper.scrape_property(url, options.cookies.as_deref()) {
         Ok(property) => {
             all_properties.push(property);
@@ -76,13 +78,22 @@ pub fn scrape_single_url<T: PlatformScraper>(
             utils::save_properties_to_csv(&all_properties, &options.output_file)?;
         }
         Err(e) => {
+            failed_urls.push((url.to_string(), e.to_string()));
             tui.fail_property(url)?;
-            return Err(anyhow::anyhow!("Failed to scrape URL {}: {}", url, e));
+            // Continue to show summary instead of returning early
         }
     }
 
     // Show final summary
     tui.show_final_summary(1, all_properties.len())?;
+
+    // Show failure report if there were any failures
+    tui.show_failure_report(&failed_urls)?;
+    
+    // Return error if scraping failed
+    if !failed_urls.is_empty() {
+        return Err(anyhow::anyhow!("Failed to scrape URL {}: {}", url, failed_urls[0].1));
+    }
 
     Ok(())
 }
@@ -173,6 +184,8 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
 
     // Scrape the selected URLs
     let mut newly_scraped = Vec::new();
+    let mut failed_urls = Vec::new();
+    
     for url in urls_to_scrape.iter() {
         tui.start_scraping_property(url)?;
 
@@ -194,7 +207,8 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
                 let deduplicated = deduplicate_properties_by_url(current_properties);
                 utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
             }
-            Err(_e) => {
+            Err(e) => {
+                failed_urls.push((url.clone(), e.to_string()));
                 tui.fail_property(url)?;
             }
         }
@@ -220,6 +234,9 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
 
     // Show final summary
     tui.show_final_summary(scraped_count, deduplicated_properties.len())?;
+
+    // Show failure report if there were any failures
+    tui.show_failure_report(&failed_urls)?;
 
     Ok(())
 }

@@ -306,6 +306,35 @@ impl ScraperTUI {
         Ok(())
     }
 
+    /// Show failure report with URLs and reasons
+    pub fn show_failure_report(&self, failed_urls: &[(String, String)]) -> io::Result<()> {
+        if !failed_urls.is_empty() {
+            execute!(
+                io::stdout(),
+                Print("\n"),
+                SetForegroundColor(Color::Red),
+                Print(format!("❌ Failure Report ({} failed URLs):\n", failed_urls.len())),
+                ResetColor
+            )?;
+
+            for (url, reason) in failed_urls {
+                execute!(
+                    io::stdout(),
+                    SetForegroundColor(Color::Red),
+                    Print("  • "),
+                    ResetColor,
+                    SetForegroundColor(Color::White),
+                    Print(format!("{}\n", Self::truncate_url(url))),
+                    ResetColor,
+                    SetForegroundColor(Color::DarkGrey),
+                    Print(format!("    Reason: {}\n", reason)),
+                    ResetColor
+                )?;
+            }
+        }
+        Ok(())
+    }
+
     fn find_property_index(&self, url: &str) -> Option<usize> {
         self.property_lines.iter().position(|p| p.url == url)
     }
