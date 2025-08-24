@@ -38,7 +38,7 @@ pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>
 
     // Otherwise, scrape additional pages up to max_pages
     for page in 2..=max_pages {
-        let page_url = format!("{}?page={}", base_url, page);
+        let page_url = format!("{}/page/{}", base_url, page);
         debug_println!("Scraping index page: {}", page_url);
 
         match scrape_index_page_with_url(&page_url) {
