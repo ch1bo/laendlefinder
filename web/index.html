@@ -470,19 +470,10 @@
             line-height: 1.4;
             max-width: 220px;
             cursor: pointer;
-            transition: all 0.2s ease;
             user-select: none;
             background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
             -webkit-tap-highlight-color: transparent;
             pointer-events: auto;
-        }
-        .lean-popup:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.2);
-        }
-        .lean-popup:active {
-            transform: scale(0.95) translateY(-1px);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
         }
         
         @media (max-width: 768px) {
@@ -841,10 +832,14 @@
 
         // Function to create lean popup content for hover
         function createLeanPopupContent(property) {
+            const priceInfo = formatPriceWithSqmPrice(property);
+            const title = property.name || property.location;
+            const truncatedTitle = truncateTitle(title, 80);
             return `
-                <div class="popup-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
-                <div class="popup-location">${property.name || property.location}</div>
+                <div class="popup-price">${priceInfo}</div>
+                <div class="popup-location" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-wrap: break-word; line-height: 1.3;">${truncatedTitle}</div>
                 <div class="popup-type">${formatPropertyType(property.property_type)}</div>
+                ${property.date ? `<div style="color: #666; font-size: 0.85em; margin-top: 2px;">${property.date}</div>` : ''}
                 <div class="popup-tap-hint">Click to view details</div>
             `;
         }
@@ -952,6 +947,8 @@
                 propertyDiv.className = `property-item ${property.listing_type}`;
                 propertyDiv.propertyData = property; // Store property reference
                 
+                const sizeInfo = createSizeInfoLine(property);
+                
                 propertyDiv.innerHTML = `
                     <div class="property-header">
                         <div class="property-title">${property.name || `${property.location} - ${formatPropertyType(property.property_type)}`}</div>
@@ -959,13 +956,13 @@
                             Details
                         </a>
                     </div>
-                    <div class="property-price">${property.price ? formatPrice(property.price) : 'Price not available'}</div>
                     <div class="property-location">${property.address || property.location}</div>
+                    <div class="property-price">${formatPriceWithSqmPrice(property)}</div>
+                    ${sizeInfo}
                     <div class="property-stats">
                         <span class="info-listing-type listing-type-${property.listing_type}">
                             ${property.listing_type.charAt(0).toUpperCase() + property.listing_type.slice(1)}
                         </span>
-                        ${property.size_living ? `<span>${property.size_living} m²</span>` : ''}
                         ${property.date ? `<span>${property.date}</span>` : ''}
                     </div>
                 `;
@@ -996,6 +993,51 @@
             return `€${numPrice.toLocaleString()}`;
         }
 
+        // Helper function to format price with three-column layout
+        function formatPriceWithSqmPrice(property) {
+            if (!property.price) return 'Price not available';
+            
+            const numPrice = parseInt(property.price);
+            if (isNaN(numPrice)) return property.price;
+            
+            const formattedPrice = `€${numPrice.toLocaleString()}`;
+            
+            // Calculate living price per sqm
+            let livingPricePerSqm = '';
+            if (property.size_living) {
+                const livingMatch = property.size_living.match(/(\d+(?:[.,]\d+)?)/);
+                if (livingMatch) {
+                    const livingSize = parseFloat(livingMatch[1].replace(',', '.'));
+                    if (livingSize > 0) {
+                        const livingSqmPrice = Math.round(numPrice / livingSize);
+                        livingPricePerSqm = `€${livingSqmPrice.toLocaleString()}/m²`;
+                    }
+                }
+            }
+            
+            // Calculate ground price per sqm
+            let groundPricePerSqm = '';
+            if (property.size_ground) {
+                const groundMatch = property.size_ground.match(/(\d+(?:[.,]\d+)?)/);
+                if (groundMatch) {
+                    const groundSize = parseFloat(groundMatch[1].replace(',', '.'));
+                    if (groundSize > 0) {
+                        const groundSqmPrice = Math.round(numPrice / groundSize);
+                        groundPricePerSqm = `€${groundSqmPrice.toLocaleString()}/m²`;
+                    }
+                }
+            }
+            
+            // Create three-column layout
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                    <span style="color: #2c8a2c; font-weight: bold; font-size: 1em; flex: 1; text-align: left;">${formattedPrice}</span>
+                    ${livingPricePerSqm ? `<span style="color: #666; font-weight: bold; font-size: 1em; flex: 1; text-align: center;">${livingPricePerSqm}</span>` : '<span style="flex: 1;"></span>'}
+                    ${groundPricePerSqm ? `<span style="color: #666; font-weight: bold; font-size: 1em; flex: 1; text-align: right;">${groundPricePerSqm}</span>` : '<span style="flex: 1;"></span>'}
+                </div>
+            `;
+        }
+
         // Helper function to convert property type to German label
         function formatPropertyType(propertyType) {
             switch (propertyType) {
@@ -1005,6 +1047,31 @@
                 case 'unknown': return 'Unbekannt';
                 default: return propertyType;
             }
+        }
+
+        // Helper function to truncate title with ellipsis
+        function truncateTitle(title, maxLength) {
+            if (!title || title.length <= maxLength) return title;
+            return title.substring(0, maxLength).trim() + '...';
+        }
+
+        // Helper function to create size info line for cards
+        function createSizeInfoLine(property) {
+            const hasLivingSize = property.size_living;
+            const hasGroundSize = property.size_ground;
+            
+            // Skip the line if both sizes are not available
+            if (!hasLivingSize && !hasGroundSize) {
+                return '';
+            }
+            
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; color: #666; font-size: 0.9em;">
+                    <span style="flex: 1;"></span>
+                    ${hasLivingSize ? `<span style="flex: 1; text-align: center;">${property.size_living}${property.size_living.includes('m²') ? '' : ' m²'}</span>` : '<span style="flex: 1;"></span>'}
+                    ${hasGroundSize ? `<span style="flex: 1; text-align: right;">${property.size_ground}${property.size_ground.includes('m²') ? '' : ' m²'}</span>` : '<span style="flex: 1;"></span>'}
+                </div>
+            `;
         }
 
         // Function to apply filters
