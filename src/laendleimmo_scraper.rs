@@ -9,6 +9,8 @@ use scraper::{Html, Selector};
 use std::collections::HashSet;
 
 const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt";
+// const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt/grundstuck/baugrundstuck";
+// const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt/haus/einfamilienhaus";
 
 pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>, existing_urls: &HashSet<String>) -> Result<Vec<String>> {
     use std::collections::HashSet;
