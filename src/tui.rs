@@ -71,7 +71,7 @@ impl ScraperTUI {
     }
 
     /// Update gathering progress
-    pub fn update_gathering_progress(&mut self, current_page: usize, max_pages: usize, urls_found: usize) -> io::Result<()> {
+    pub fn update_gathering_progress(&mut self, current_page: usize, max_pages: usize, urls_found: usize, new_urls: usize, known_urls: usize) -> io::Result<()> {
         // Move back to the gathering line and clear it
         execute!(
             io::stdout(),
@@ -90,8 +90,8 @@ impl ScraperTUI {
             io::stdout(),
             SetForegroundColor(Color::White),
             Print(format!(
-                "{} Gathering URLs from listing pages ({}/{}) - {} URLs found\n",
-                spinner, current_page, max_pages, urls_found
+                "{} Gathering URLs from listing pages ({}/{}) - {} URLs found ({} new, {} known)\n",
+                spinner, current_page, max_pages, urls_found, new_urls, known_urls
             )),
             ResetColor
         )?;

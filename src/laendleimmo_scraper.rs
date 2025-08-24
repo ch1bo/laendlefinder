@@ -6,11 +6,17 @@ use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use regex::Regex;
 use scraper::{Html, Selector};
+use std::collections::HashSet;
 
 const BASE_URL: &str = "https://www.laendleimmo.at/kaufobjekt";
 
-pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>, existing_urls: &HashSet<String>) -> Result<Vec<String>> {
+    use std::collections::HashSet;
+    
     let mut all_property_urls = Vec::new();
+    let mut seen_urls = HashSet::new();
+    let mut new_count = 0;
+    let mut known_count = 0;
 
     if let Some(tui) = tui.as_mut() {
         tui.start_gathering(max_pages)?;
@@ -31,10 +37,24 @@ pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTU
                     debug_println!("No more properties found on page {}, stopping", page);
                     break;
                 }
-                all_property_urls.extend(urls);
+                
+                let mut new_urls_added = 0;
+                for url in urls {
+                    if seen_urls.insert(url.clone()) {
+                        all_property_urls.push(url.clone());
+                        new_urls_added += 1;
+                        if existing_urls.contains(&url) {
+                            known_count += 1;
+                        } else {
+                            new_count += 1;
+                        }
+                    }
+                }
+                
+                debug_println!("Page {}: added {} new URLs, {} total unique", page, new_urls_added, all_property_urls.len());
                 
                 if let Some(tui) = tui.as_mut() {
-                    tui.update_gathering_progress(page, max_pages, all_property_urls.len())?;
+                    tui.update_gathering_progress(page, max_pages, all_property_urls.len(), new_count, known_count)?;
                 }
             }
             Err(e) => {

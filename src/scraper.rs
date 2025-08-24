@@ -7,11 +7,17 @@ use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use std::collections::HashSet;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
-pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>) -> Result<Vec<String>> {
+pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>, existing_urls: &HashSet<String>) -> Result<Vec<String>> {
+    use std::collections::HashSet;
+    
     let mut all_property_urls = Vec::new();
+    let mut seen_urls = HashSet::new();
+    let mut new_count = 0;
+    let mut known_count = 0;
     let base_url = "https://www.vol.at/themen/grund-und-boden";
 
     if let Some(tui) = tui.as_mut() {
@@ -22,10 +28,19 @@ pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>
 
     // Scrape the first page
     let property_urls = scrape_index_page()?;
-    all_property_urls.extend(property_urls);
+    for url in property_urls {
+        if seen_urls.insert(url.clone()) {
+            all_property_urls.push(url.clone());
+            if existing_urls.contains(&url) {
+                known_count += 1;
+            } else {
+                new_count += 1;
+            }
+        }
+    }
 
     if let Some(tui) = tui.as_mut() {
-        tui.update_gathering_progress(1, max_pages, all_property_urls.len())?;
+        tui.update_gathering_progress(1, max_pages, all_property_urls.len(), new_count, known_count)?;
     }
 
     // If max_pages is 1, we're done
@@ -47,10 +62,24 @@ pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>
                     debug_println!("No more properties found on page {}, stopping", page);
                     break;
                 }
-                all_property_urls.extend(urls);
+                
+                let mut new_urls_added = 0;
+                for url in urls {
+                    if seen_urls.insert(url.clone()) {
+                        all_property_urls.push(url.clone());
+                        new_urls_added += 1;
+                        if existing_urls.contains(&url) {
+                            known_count += 1;
+                        } else {
+                            new_count += 1;
+                        }
+                    }
+                }
+                
+                debug_println!("Page {}: added {} new URLs, {} total unique", page, new_urls_added, all_property_urls.len());
                 
                 if let Some(tui) = tui.as_mut() {
-                    tui.update_gathering_progress(page, max_pages, all_property_urls.len())?;
+                    tui.update_gathering_progress(page, max_pages, all_property_urls.len(), new_count, known_count)?;
                 }
             }
             Err(e) => {

@@ -15,8 +15,9 @@ impl PlatformScraper for VolScraper {
         &self,
         max_pages: usize,
         tui: Option<&mut ScraperTUI>,
+        existing_urls: &std::collections::HashSet<String>,
     ) -> Result<Vec<String>> {
-        scraper::scrape_all_index_pages(max_pages, tui)
+        scraper::scrape_all_index_pages(max_pages, tui, existing_urls)
     }
 
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property> {
@@ -36,8 +37,9 @@ impl PlatformScraper for LaendleimmoScraper {
         &self,
         max_pages: usize,
         tui: Option<&mut ScraperTUI>,
+        existing_urls: &std::collections::HashSet<String>,
     ) -> Result<Vec<String>> {
-        laendleimmo_scraper::scrape_all_listing_pages(max_pages, tui)
+        laendleimmo_scraper::scrape_all_listing_pages(max_pages, tui, existing_urls)
     }
 
     fn scrape_property(&self, url: &str, _cookies: Option<&str>) -> Result<Property> {

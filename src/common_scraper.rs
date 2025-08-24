@@ -34,6 +34,7 @@ pub trait PlatformScraper {
         &self,
         max_pages: usize,
         tui: Option<&mut ScraperTUI>,
+        existing_urls: &HashSet<String>,
     ) -> Result<Vec<String>>;
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property>;
 }
@@ -124,7 +125,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         // Create a set of existing URLs for fast lookup
         let existing_urls: HashSet<String> = relevant_urls.into_iter().collect();
 
-        let found_urls = scraper.scrape_listings(options.max_pages, Some(&mut tui))?;
+        let found_urls = scraper.scrape_listings(options.max_pages, Some(&mut tui), &existing_urls)?;
 
         if found_urls.is_empty() {
             tui.update_listing_status(0, 0)?;
