@@ -71,15 +71,15 @@ pub fn scrape_single_url<T: PlatformScraper>(
             all_properties.push(property);
             tui.complete_property(url)?;
             debug_println!("Successfully scraped and updated: {}", url);
+            
+            // Save immediately after successful scrape
+            utils::save_properties_to_csv(&all_properties, &options.output_file)?;
         }
         Err(e) => {
             tui.fail_property(url)?;
             return Err(anyhow::anyhow!("Failed to scrape URL {}: {}", url, e));
         }
     }
-
-    // 4. Save updated properties to CSV
-    utils::save_properties_to_csv(&all_properties, &options.output_file)?;
 
     // Show final summary
     tui.show_final_summary(1, all_properties.len())?;
@@ -97,7 +97,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     let mut tui = ScraperTUI::new();
 
     // 1. Load all existing properties
-    let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
+    let all_properties = utils::load_properties_from_csv(&options.output_file)?;
     tui.show_summary(all_properties.len())?;
 
     let relevant_urls: Vec<String> = all_properties
@@ -178,8 +178,21 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
 
         match scraper.scrape_property(url, options.cookies.as_deref()) {
             Ok(property) => {
-                newly_scraped.push(property);
+                newly_scraped.push(property.clone());
                 tui.complete_property(url)?;
+                
+                // Save progress after each successful scrape
+                let mut current_properties = all_properties.clone();
+                current_properties.extend(newly_scraped.clone());
+                
+                // If in refresh mode, remove old versions of successfully scraped URLs
+                if options.refresh {
+                    let scraped_urls: HashSet<String> = newly_scraped.iter().map(|p| p.url.clone()).collect();
+                    current_properties.retain(|p| !scraped_urls.contains(&p.url) || newly_scraped.iter().any(|np| np.url == p.url));
+                }
+                
+                let deduplicated = deduplicate_properties_by_url(current_properties);
+                utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
             }
             Err(_e) => {
                 tui.fail_property(url)?;
@@ -190,21 +203,20 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    // If in refresh mode, remove old versions of the URLs we just scraped
+    // Final cleanup and summary (properties already saved after each scrape)
+    let scraped_count = newly_scraped.len();
+    
+    // Calculate final totals for summary
+    let mut final_properties = all_properties.clone();
+    final_properties.extend(newly_scraped.clone());
+    
     if options.refresh {
         let scraped_urls: HashSet<String> = urls_to_scrape.iter().cloned().collect();
-        all_properties.retain(|p| !scraped_urls.contains(&p.url));
+        final_properties.retain(|p| !scraped_urls.contains(&p.url));
+        final_properties.extend(newly_scraped);
     }
-
-    // Add newly scraped properties
-    let scraped_count = newly_scraped.len();
-    all_properties.extend(newly_scraped);
-
-    // 4. Deduplicate by URL and backup/save
-    let deduplicated_properties = deduplicate_properties_by_url(all_properties);
-
-    // Backup and save the deduplicated results
-    utils::save_properties_to_csv(&deduplicated_properties, &options.output_file)?;
+    
+    let deduplicated_properties = deduplicate_properties_by_url(final_properties);
 
     // Show final summary
     tui.show_final_summary(scraped_count, deduplicated_properties.len())?;
