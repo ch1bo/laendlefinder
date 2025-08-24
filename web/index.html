@@ -628,6 +628,37 @@
             };
             localStorage.setItem('laendlefinderMapPosition', JSON.stringify(mapPosition));
         }
+
+        // Local storage functions for filter settings
+        function saveFilterSettings() {
+            const filterSettings = {
+                available: document.getElementById('filter-available').checked,
+                sold: document.getElementById('filter-sold').checked,
+                apartment: document.getElementById('filter-apartment').checked,
+                house: document.getElementById('filter-house').checked,
+                land: document.getElementById('filter-land').checked,
+                unknown: document.getElementById('filter-unknown').checked,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('laendlefinderFilters', JSON.stringify(filterSettings));
+        }
+
+        function getStoredFilterSettings() {
+            try {
+                const stored = localStorage.getItem('laendlefinderFilters');
+                if (stored) {
+                    const settings = JSON.parse(stored);
+                    // Only use stored settings if they're less than 30 days old
+                    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+                    if (Date.now() - settings.timestamp < thirtyDaysInMs) {
+                        return settings;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading stored filter settings:', error);
+            }
+            return null;
+        }
         
         function getStoredMapPosition() {
             try {
@@ -932,7 +963,7 @@
             // Add live count at the top
             const liveCount = document.createElement('div');
             liveCount.className = 'live-count';
-            liveCount.textContent = `${properties.length} properties in current view`;
+            liveCount.textContent = `${properties.length} out of ${filteredProperties.length} visible`;
             listContainer.appendChild(liveCount);
             
             // Sort properties by date (newest first)
@@ -1083,6 +1114,9 @@
             const showLand = document.getElementById('filter-land').checked;
             const showUnknown = document.getElementById('filter-unknown').checked;
             
+            // Save filter settings to local storage
+            saveFilterSettings();
+            
             filteredProperties = allProperties.filter(property => {
                 // Filter by listing type
                 if (property.listing_type === 'available' && !showAvailable) return false;
@@ -1159,6 +1193,15 @@
             map.setView([47.2499, 9.9809], 10); // Reset to initial Vorarlberg view
             // Save the reset position to local storage
             saveMapPosition(47.2499, 9.9809, 10);
+            
+            // Reset all filters to checked state
+            document.getElementById('filter-available').checked = true;
+            document.getElementById('filter-sold').checked = true;
+            document.getElementById('filter-apartment').checked = true;
+            document.getElementById('filter-house').checked = true;
+            document.getElementById('filter-land').checked = true;
+            document.getElementById('filter-unknown').checked = true;
+            
             applyFilters(); // Refresh the display
             closeSidebar(); // Close the panel after reset
         }
@@ -1358,6 +1401,19 @@
             }, 100);
         }
 
+        // Function to restore filter settings from local storage
+        function restoreFilterSettings() {
+            const storedSettings = getStoredFilterSettings();
+            if (storedSettings) {
+                document.getElementById('filter-available').checked = storedSettings.available;
+                document.getElementById('filter-sold').checked = storedSettings.sold;
+                document.getElementById('filter-apartment').checked = storedSettings.apartment;
+                document.getElementById('filter-house').checked = storedSettings.house;
+                document.getElementById('filter-land').checked = storedSettings.land;
+                document.getElementById('filter-unknown').checked = storedSettings.unknown;
+            }
+        }
+
         // Add automatic filter event listeners
         function setupFilterListeners() {
             const filterIds = [
@@ -1375,6 +1431,7 @@
 
         // Load the CSV data when the page loads
         document.addEventListener('DOMContentLoaded', function() {
+            restoreFilterSettings(); // Restore saved filter settings first
             loadCSVData();
             setupFilterListeners();
         });
