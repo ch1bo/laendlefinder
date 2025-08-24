@@ -541,14 +541,6 @@
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(0,123,255,0.3);
         }
-        .marker-highlighted div {
-            background-color: #ffc107 !important;
-            border-color: #ff6b35 !important;
-            border-width: 3px !important;
-            transform: scale(1.3) !important;
-            box-shadow: 0 0 15px rgba(255, 193, 7, 0.8) !important;
-            z-index: 1000 !important;
-        }
     </style>
 </head>
 <body>
@@ -754,16 +746,16 @@
                     }
                     
                     // Choose marker color based on listing type
-                    const markerColor = property.listing_type === 'sold' ? 'red' : 'green';
+                    const markerColor = property.listing_type === 'sold' ? '#ff0000' : '#28a745';
                     
-                    // Create marker with custom icon
-                    const marker = L.marker([coords[0], coords[1]], {
-                        icon: L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div style="background-color: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
-                            iconSize: [16, 16],
-                            iconAnchor: [8, 8]
-                        })
+                    // Create lightweight CircleMarker (hardware accelerated)
+                    const marker = L.circleMarker([coords[0], coords[1]], {
+                        radius: 8,
+                        fillColor: markerColor,
+                        color: 'white',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
                     }).addTo(map);
                     
                     // Store property reference with marker
@@ -1239,24 +1231,33 @@
 
         // Function to highlight a marker when its property list item is clicked
         function highlightMarker(property) {
-            // Clear previous marker highlighting
+            // Clear previous marker highlighting by restoring original style
             if (currentHighlightedMarker) {
-                const previousElement = currentHighlightedMarker.getElement();
-                if (previousElement) {
-                    previousElement.classList.remove('marker-highlighted');
-                }
+                const originalColor = currentHighlightedMarker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745';
+                currentHighlightedMarker.setStyle({
+                    radius: 8,
+                    fillColor: originalColor,
+                    color: 'white',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
             }
             
             // Find the marker with matching property data
             const marker = markers.find(m => m.propertyData && m.propertyData.url === property.url);
             
             if (marker) {
-                // Add highlighting class to the marker element
-                const markerElement = marker.getElement();
-                if (markerElement) {
-                    markerElement.classList.add('marker-highlighted');
-                    currentHighlightedMarker = marker;
-                }
+                // Highlight the marker by increasing size and changing border
+                marker.setStyle({
+                    radius: 10,
+                    fillColor: marker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745',
+                    color: '#ffc107', // Yellow border for highlighting
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 1
+                });
+                currentHighlightedMarker = marker;
                 
                 // Center map on the marker (only when called from list click)
                 if (marker !== currentHighlightedMarker || !document.querySelector('.property-item.highlighted')) {
@@ -1278,10 +1279,15 @@
             
             // Clear marker highlighting
             if (currentHighlightedMarker) {
-                const markerElement = currentHighlightedMarker.getElement();
-                if (markerElement) {
-                    markerElement.classList.remove('marker-highlighted');
-                }
+                const originalColor = currentHighlightedMarker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745';
+                currentHighlightedMarker.setStyle({
+                    radius: 8,
+                    fillColor: originalColor,
+                    color: 'white',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
                 currentHighlightedMarker = null;
             }
         }
