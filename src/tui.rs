@@ -15,6 +15,9 @@ pub struct ScraperTUI {
     known_count: usize,
     is_refresh_mode: bool,
     progress_bar_printed: bool,
+    visible_lines: usize,
+    visible_start: usize,
+    visible_end: usize,
 }
 
 #[derive(Clone)]
@@ -42,6 +45,9 @@ impl ScraperTUI {
             known_count: 0,
             is_refresh_mode: false,
             progress_bar_printed: false,
+            visible_lines: 0,
+            visible_start: 0,
+            visible_end: 0,
         }
     }
 
@@ -163,20 +169,35 @@ impl ScraperTUI {
             status: PropertyStatus::Pending,
         };
 
-        execute!(
-            io::stdout(),
-            SetForegroundColor(Color::DarkGrey),
-            Print(format!("  ⏳ {}\n", Self::truncate_url(&url))),
-            ResetColor
-        )?;
-
         self.property_lines.push(property_state);
+        let new_index = self.property_lines.len() - 1;
+        
+        // Update visible range if this is the first property or if we're still in the initial window
+        if self.visible_end == 0 || new_index < 15 {
+            self.visible_end = (new_index + 1).min(15);
+        }
+        
+        // Only print if this property should be visible in our current window
+        if new_index < self.visible_end {
+            execute!(
+                io::stdout(),
+                SetForegroundColor(Color::DarkGrey),
+                Print(format!("  ⏳ {}\n", Self::truncate_url(&url))),
+                ResetColor
+            )?;
+            self.visible_lines += 1;
+        }
+        
         Ok(())
     }
 
     /// Print initial progress bar (call this after all properties are added)
     pub fn show_initial_progress_bar(&mut self) -> io::Result<()> {
         if !self.progress_bar_printed && !self.property_lines.is_empty() {
+            // Set the initial visible window
+            self.visible_start = 0;
+            self.visible_end = 15.min(self.property_lines.len());
+            
             self.print_progress_bar()?;
             self.progress_bar_printed = true;
         }
@@ -188,7 +209,17 @@ impl ScraperTUI {
         if let Some(index) = self.find_property_index(url) {
             self.property_lines[index].status = PropertyStatus::InProgress;
             self.current_property_index = Some(index);
-            self.update_property_line(index)?;
+            
+            // Only slide window if we're at the boundary (last 2 visible items)
+            if index >= self.visible_end.saturating_sub(2) && self.visible_end < self.property_lines.len() {
+                self.slide_window_forward()?;
+            } else if index >= self.visible_start && index < self.visible_end {
+                // Just update the line in place if it's already visible
+                self.update_single_line(index)?;
+            } else {
+                // Property is outside visible range, need to slide to show it
+                self.slide_window_to_show(index)?;
+            }
         }
         Ok(())
     }
@@ -197,7 +228,9 @@ impl ScraperTUI {
     pub fn update_activity(&mut self) -> io::Result<()> {
         if let Some(index) = self.current_property_index {
             if self.property_lines[index].status == PropertyStatus::InProgress {
-                self.update_property_line(index)?;
+                if index >= self.visible_start && index < self.visible_end {
+                    self.update_single_line(index)?;
+                }
             }
         }
         Ok(())
@@ -207,12 +240,13 @@ impl ScraperTUI {
     pub fn complete_property(&mut self, url: &str) -> io::Result<()> {
         if let Some(index) = self.find_property_index(url) {
             self.property_lines[index].status = PropertyStatus::Completed;
-            self.update_property_line(index)?;
             if Some(index) == self.current_property_index {
                 self.current_property_index = None;
             }
-            if self.progress_bar_printed {
-                self.update_progress_bar_in_place()?;
+            
+            // Just update the line in place if it's visible
+            if index >= self.visible_start && index < self.visible_end {
+                self.update_single_line(index)?;
             }
         }
         Ok(())
@@ -222,12 +256,13 @@ impl ScraperTUI {
     pub fn fail_property(&mut self, url: &str) -> io::Result<()> {
         if let Some(index) = self.find_property_index(url) {
             self.property_lines[index].status = PropertyStatus::Failed;
-            self.update_property_line(index)?;
             if Some(index) == self.current_property_index {
                 self.current_property_index = None;
             }
-            if self.progress_bar_printed {
-                self.update_progress_bar_in_place()?;
+            
+            // Just update the line in place if it's visible
+            if index >= self.visible_start && index < self.visible_end {
+                self.update_single_line(index)?;
             }
         }
         Ok(())
@@ -275,27 +310,86 @@ impl ScraperTUI {
         self.property_lines.iter().position(|p| p.url == url)
     }
 
-    fn update_property_line(&self, index: usize) -> io::Result<()> {
-        // Calculate how many lines to move back to reach the specific property line
-        let mut lines_back = self.property_lines.len() - index;
-        
-        // If progress bar is printed, account for it (2 extra lines: separator + progress bar)
-        if self.progress_bar_printed {
-            lines_back += 2;
+    /// Update a single line in place without redrawing the entire window
+    fn update_single_line(&mut self, _index: usize) -> io::Result<()> {
+        // For simplicity, just redraw the entire window for now
+        // This is still less janky than redrawing on every property change
+        self.redraw_sliding_window()?;
+        Ok(())
+    }
+
+    /// Slide the window forward by a few positions
+    fn slide_window_forward(&mut self) -> io::Result<()> {
+        // Calculate new window that shows last 3 completed + current + remaining pending (up to 15 total)
+        if let Some(current_idx) = self.current_property_index {
+            // Find the number of completed properties before current
+            let completed_before = self.property_lines[..current_idx]
+                .iter()
+                .filter(|p| matches!(p.status, PropertyStatus::Completed | PropertyStatus::Failed))
+                .count();
+            
+            // Start from 3 completed properties back, or beginning if less than 3
+            let new_start = if completed_before >= 3 {
+                // Find the index of the 3rd completed property before current
+                let mut completed_count = 0;
+                let mut start_idx = current_idx;
+                for i in (0..current_idx).rev() {
+                    if matches!(self.property_lines[i].status, PropertyStatus::Completed | PropertyStatus::Failed) {
+                        completed_count += 1;
+                        if completed_count == 3 {
+                            start_idx = i;
+                            break;
+                        }
+                    }
+                }
+                start_idx
+            } else {
+                0 // Show from beginning if we don't have 3 completed yet
+            };
+            
+            let new_end = (new_start + 15).min(self.property_lines.len());
+            
+            if new_start != self.visible_start || new_end != self.visible_end {
+                self.visible_start = new_start;
+                self.visible_end = new_end;
+                self.redraw_sliding_window()?;
+            }
         }
+        Ok(())
+    }
+
+    /// Slide the window to show a specific property
+    fn slide_window_to_show(&mut self, index: usize) -> io::Result<()> {
+        let new_start = index.saturating_sub(7); // Show more context with 15 total lines
+        let new_end = (new_start + 15).min(self.property_lines.len());
         
-        execute!(
-            io::stdout(),
-            MoveToPreviousLine(lines_back as u16),
-            Clear(ClearType::CurrentLine),
-        )?;
+        self.visible_start = new_start;
+        self.visible_end = new_end;
+        self.redraw_sliding_window()?;
+        Ok(())
+    }
 
-        // Redraw this line
-        self.draw_property_line(&self.property_lines[index])?;
+    /// Clear visible property lines and redraw the sliding window
+    fn redraw_sliding_window(&mut self) -> io::Result<()> {
+        // Calculate how many lines to clear (visible property lines + progress bar if present)
+        let lines_to_clear = self.visible_lines + if self.progress_bar_printed { 2 } else { 0 };
+        
+        if lines_to_clear > 0 {
+            // Move back and clear all visible lines
+            execute!(
+                io::stdout(),
+                MoveToPreviousLine(lines_to_clear as u16),
+                Clear(ClearType::FromCursorDown),
+            )?;
+        }
 
-        // Redraw all lines after this one
-        for i in (index + 1)..self.property_lines.len() {
+        // Reset visible lines counter
+        self.visible_lines = 0;
+
+        // Redraw visible properties
+        for i in self.visible_start..self.visible_end {
             self.draw_property_line(&self.property_lines[i])?;
+            self.visible_lines += 1;
         }
 
         // Redraw progress bar if it was there
@@ -354,27 +448,6 @@ impl ScraperTUI {
         Ok(())
     }
 
-    /// Update the progress bar in place (without moving property lines)
-    fn update_progress_bar_in_place(&self) -> io::Result<()> {
-        if self.property_lines.is_empty() || !self.progress_bar_printed {
-            return Ok(());
-        }
-
-        let status_line = self.create_progress_bar_text();
-
-        // Move back to progress bar line and update it
-        execute!(
-            io::stdout(),
-            MoveToPreviousLine(1), // Move back to progress bar line
-            Clear(ClearType::CurrentLine),
-            SetForegroundColor(Color::White),
-            Print(status_line),
-            Print("\n"),
-            ResetColor
-        )?;
-
-        Ok(())
-    }
 
     /// Create the progress bar text
     fn create_progress_bar_text(&self) -> String {
@@ -407,7 +480,7 @@ impl ScraperTUI {
 
     /// Clear the progress bar (used before final summary)
     fn clear_progress_bar(&self) -> io::Result<()> {
-        if !self.property_lines.is_empty() {
+        if !self.property_lines.is_empty() && self.progress_bar_printed {
             // Move back 2 lines (separator + progress bar)
             execute!(
                 io::stdout(),
