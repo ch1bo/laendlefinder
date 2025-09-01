@@ -16,8 +16,8 @@ struct Args {
     cookies: Option<String>,
     
     /// Maximum number of pages to scrape per platform
-    #[clap(short, long, default_value = "1")]
-    max_pages: usize,
+    #[clap(short, long)]
+    max_pages: Option<usize>,
     
     /// Maximum number of items to scrape per platform (if not set, scrape all available items)
     #[clap(short = 'i', long)]
@@ -27,8 +27,8 @@ struct Args {
     #[clap(short, long)]
     refresh: bool,
     
-    /// Scrape new URLs until no new ones found in 5 consecutive pages (default mode)
-    #[clap(short, long, default_value = "true")]
+    /// Scrape new URLs until no new ones found in 5 consecutive pages (default mode unless other options specified)
+    #[clap(short, long)]
     new: bool,
     
     /// Skip vol.at scraper
@@ -60,12 +60,19 @@ fn main() -> Result<()> {
     }
     
     // Create scraping options
+    // Use new mode by default, unless other flags are provided
+    let use_new_mode = if args.max_items.is_some() || args.max_pages.is_some() || args.refresh {
+        args.new // Use explicit --new flag when other options are specified
+    } else {
+        true // Default to new mode when no specific options provided
+    };
+    
     let options = ScrapingOptions {
         output_file: args.output.clone(),
         max_pages: args.max_pages,
         max_items: args.max_items,
         refresh: args.refresh,
-        new: args.new,
+        new: use_new_mode,
         cookies: args.cookies.clone(),
         debug: args.debug,
     };

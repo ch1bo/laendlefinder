@@ -8,7 +8,7 @@ use std::collections::HashSet;
 #[derive(Debug, Clone)]
 pub struct ScrapingOptions {
     pub output_file: String,
-    pub max_pages: usize,
+    pub max_pages: Option<usize>,
     pub max_items: Option<usize>,
     pub refresh: bool,
     pub new: bool,
@@ -20,7 +20,7 @@ impl Default for ScrapingOptions {
     fn default() -> Self {
         Self {
             output_file: "properties.csv".to_string(),
-            max_pages: 1,
+            max_pages: None,
             max_items: None,
             refresh: false,
             new: true,
@@ -34,7 +34,7 @@ pub trait PlatformScraper {
     fn base_url(&self) -> &str;
     fn scrape_listings(
         &self,
-        max_pages: usize,
+        max_pages: Option<usize>,
         tui: Option<&mut ScraperTUI>,
         existing_urls: &HashSet<String>,
     ) -> Result<Vec<String>>;
