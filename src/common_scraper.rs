@@ -11,6 +11,7 @@ pub struct ScrapingOptions {
     pub max_pages: usize,
     pub max_items: Option<usize>,
     pub refresh: bool,
+    pub new: bool,
     pub cookies: Option<String>,
     pub debug: bool,
 }
@@ -22,6 +23,7 @@ impl Default for ScrapingOptions {
             max_pages: 1,
             max_items: None,
             refresh: false,
+            new: true,
             cookies: None,
             debug: false,
         }
@@ -33,6 +35,11 @@ pub trait PlatformScraper {
     fn scrape_listings(
         &self,
         max_pages: usize,
+        tui: Option<&mut ScraperTUI>,
+        existing_urls: &HashSet<String>,
+    ) -> Result<Vec<String>>;
+    fn scrape_new_urls(
+        &self,
         tui: Option<&mut ScraperTUI>,
         existing_urls: &HashSet<String>,
     ) -> Result<Vec<String>>;
@@ -131,8 +138,39 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
 
         tui.update_listing_status_refresh(0, existing_urls.len())?;
         existing_urls
+    } else if options.new {
+        // New mode: gather new links until no new ones found in 5 consecutive pages
+        // Create a set of existing URLs for fast lookup
+        let existing_urls: HashSet<String> = relevant_urls.into_iter().collect();
+
+        let found_urls = scraper.scrape_new_urls(Some(&mut tui), &existing_urls)?;
+
+        if found_urls.is_empty() {
+            tui.update_listing_status(0, 0)?;
+            return Ok(());
+        }
+
+        // Filter out existing URLs in normal mode
+        let mut new_urls = Vec::new();
+        let mut known_count = 0;
+
+        for url in &found_urls {
+            if existing_urls.contains(url) {
+                known_count += 1;
+            } else {
+                new_urls.push(url.clone());
+            }
+        }
+
+        tui.update_listing_status(new_urls.len(), known_count)?;
+
+        if new_urls.is_empty() {
+            return Ok(());
+        }
+
+        new_urls
     } else {
-        // Normal mode: gather new links from listings
+        // Legacy mode: gather new links from listings with max_pages limit
         // Create a set of existing URLs for fast lookup
         let existing_urls: HashSet<String> = relevant_urls.into_iter().collect();
 

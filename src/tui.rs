@@ -18,6 +18,7 @@ pub struct ScraperTUI {
     visible_lines: usize,
     visible_start: usize,
     visible_end: usize,
+    is_new_mode: bool,
 }
 
 #[derive(Clone)]
@@ -48,6 +49,7 @@ impl ScraperTUI {
             visible_lines: 0,
             visible_start: 0,
             visible_end: 0,
+            is_new_mode: false,
         }
     }
 
@@ -76,6 +78,19 @@ impl ScraperTUI {
         Ok(())
     }
 
+    /// Show initial gathering status for new mode
+    pub fn start_gathering_new_mode(&mut self) -> io::Result<()> {
+        self.is_new_mode = true;
+        execute!(
+            io::stdout(),
+            SetForegroundColor(Color::White),
+            Print("⏳ Gathering URLs until no new found in 5 pages...\n"),
+            ResetColor
+        )?;
+        self.initial_lines_printed += 1;
+        Ok(())
+    }
+
     /// Update gathering progress
     pub fn update_gathering_progress(&mut self, current_page: usize, max_pages: usize, urls_found: usize, new_urls: usize, known_urls: usize) -> io::Result<()> {
         // Move back to the gathering line and clear it
@@ -92,13 +107,22 @@ impl ScraperTUI {
             _ => "⠸",
         };
 
+        let message = if self.is_new_mode {
+            format!(
+                "{} Gathering URLs until no new found (page {}) - {} URLs found ({} new, {} known)\n",
+                spinner, current_page, urls_found, new_urls, known_urls
+            )
+        } else {
+            format!(
+                "{} Gathering URLs from listing pages ({}/{}) - {} URLs found ({} new, {} known)\n",
+                spinner, current_page, max_pages, urls_found, new_urls, known_urls
+            )
+        };
+
         execute!(
             io::stdout(),
             SetForegroundColor(Color::White),
-            Print(format!(
-                "{} Gathering URLs from listing pages ({}/{}) - {} URLs found ({} new, {} known)\n",
-                spinner, current_page, max_pages, urls_found, new_urls, known_urls
-            )),
+            Print(message),
             ResetColor
         )?;
 

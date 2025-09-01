@@ -11,6 +11,81 @@ use std::collections::HashSet;
 
 const INDEX_URL: &str = "https://www.vol.at/themen/grund-und-boden";
 
+pub fn scrape_new_urls_until_no_new_found(mut tui: Option<&mut ScraperTUI>, existing_urls: &HashSet<String>) -> Result<Vec<String>> {
+    use std::collections::HashSet;
+    
+    let mut all_property_urls = Vec::new();
+    let mut seen_urls = HashSet::new();
+    let mut new_count = 0;
+    let mut known_count = 0;
+    let mut pages_without_new = 0;
+    let mut current_page = 1;
+    let base_url = "https://www.vol.at/themen/grund-und-boden";
+
+    if let Some(tui) = tui.as_mut() {
+        tui.start_gathering_new_mode()?;
+    }
+
+    loop {
+        let page_url = if current_page == 1 {
+            base_url.to_string()
+        } else {
+            format!("{}/page/{}", base_url, current_page)
+        };
+        
+        debug_println!("Scraping index page: {}", page_url);
+
+        let property_urls = if current_page == 1 {
+            scrape_index_page()?
+        } else {
+            scrape_index_page_with_url(&page_url)?
+        };
+
+        if property_urls.is_empty() {
+            debug_println!("No properties found on page {}, stopping", current_page);
+            break;
+        }
+
+        let mut new_urls_on_page = 0;
+        for url in property_urls {
+            if seen_urls.insert(url.clone()) {
+                all_property_urls.push(url.clone());
+                if existing_urls.contains(&url) {
+                    known_count += 1;
+                } else {
+                    new_count += 1;
+                    new_urls_on_page += 1;
+                }
+            }
+        }
+
+        if let Some(tui) = tui.as_mut() {
+            tui.update_gathering_progress(current_page, 0, all_property_urls.len(), new_count, known_count)?;
+        }
+
+        // Check if we found any new URLs on this page
+        if new_urls_on_page == 0 {
+            pages_without_new += 1;
+            debug_println!("Page {}: no new URLs found (consecutive pages without new: {})", current_page, pages_without_new);
+            if pages_without_new >= 5 {
+                debug_println!("No new URLs found in 5 consecutive pages, stopping");
+                break;
+            }
+        } else {
+            pages_without_new = 0; // Reset counter
+            debug_println!("Page {}: found {} new URLs", current_page, new_urls_on_page);
+        }
+
+        current_page += 1;
+    }
+
+    if let Some(tui) = tui.as_mut() {
+        tui.finish_gathering(all_property_urls.len())?;
+    }
+
+    Ok(all_property_urls)
+}
+
 pub fn scrape_all_index_pages(max_pages: usize, mut tui: Option<&mut ScraperTUI>, existing_urls: &HashSet<String>) -> Result<Vec<String>> {
     use std::collections::HashSet;
     

@@ -20,6 +20,14 @@ impl PlatformScraper for VolScraper {
         scraper::scrape_all_index_pages(max_pages, tui, existing_urls)
     }
 
+    fn scrape_new_urls(
+        &self,
+        tui: Option<&mut ScraperTUI>,
+        existing_urls: &std::collections::HashSet<String>,
+    ) -> Result<Vec<String>> {
+        scraper::scrape_new_urls_until_no_new_found(tui, existing_urls)
+    }
+
     fn scrape_property(&self, url: &str, cookies: Option<&str>) -> Result<Property> {
         check_url(self, url)?;
         scraper::scrape_property_page(url, cookies, ListingType::Sold)
@@ -40,6 +48,14 @@ impl PlatformScraper for LaendleimmoScraper {
         existing_urls: &std::collections::HashSet<String>,
     ) -> Result<Vec<String>> {
         laendleimmo_scraper::scrape_all_listing_pages(max_pages, tui, existing_urls)
+    }
+
+    fn scrape_new_urls(
+        &self,
+        tui: Option<&mut ScraperTUI>,
+        existing_urls: &std::collections::HashSet<String>,
+    ) -> Result<Vec<String>> {
+        laendleimmo_scraper::scrape_new_urls_until_no_new_found(tui, existing_urls)
     }
 
     fn scrape_property(&self, url: &str, _cookies: Option<&str>) -> Result<Property> {

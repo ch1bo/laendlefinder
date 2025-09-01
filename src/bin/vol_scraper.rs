@@ -26,6 +26,10 @@ struct Args {
     #[clap(short, long)]
     refresh: bool,
     
+    /// Scrape new URLs until no new ones found in 5 consecutive pages (default mode)
+    #[clap(short, long, default_value = "true")]
+    new: bool,
+    
     /// Enable debug output
     #[clap(short, long)]
     debug: bool,
@@ -40,6 +44,7 @@ fn main() -> Result<()> {
         max_pages: args.max_pages,
         max_items: args.max_items,
         refresh: args.refresh,
+        new: args.new,
         cookies: args.cookies,
         debug: args.debug,
     };
