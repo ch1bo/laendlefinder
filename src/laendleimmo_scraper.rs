@@ -177,9 +177,12 @@ pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
                     format!("https://www.laendleimmo.at{}", href)
                 };
 
+                // Sanitize URL to remove query parameters for consistent comparison
+                let sanitized_url = crate::utils::sanitize_url(&full_url);
+
                 // Avoid duplicates
-                if !property_urls.contains(&full_url) {
-                    property_urls.push(full_url);
+                if !property_urls.contains(&sanitized_url) {
+                    property_urls.push(sanitized_url);
                 }
             }
         }
