@@ -201,7 +201,7 @@ pub fn scrape_property_page(
     let document = Html::parse_document(&html);
 
     // Try to extract data from embedded JavaScript
-    let script_selector = Selector::parse("#externalPostDataNode").unwrap();
+    let script_selector = Selector::parse("#newExternalPostDataNode").unwrap();
     if let Some(script) = document.select(&script_selector).next() {
         debug_println!("Found externalPostDataNode script tag");
         let json_str = script.inner_html();

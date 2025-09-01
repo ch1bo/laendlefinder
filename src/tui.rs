@@ -324,7 +324,7 @@ impl ScraperTUI {
                     Print("  • "),
                     ResetColor,
                     SetForegroundColor(Color::White),
-                    Print(format!("{}\n", Self::truncate_url(url))),
+                    Print(format!("{}\n", url)),
                     ResetColor,
                     SetForegroundColor(Color::DarkGrey),
                     Print(format!("    Reason: {}\n", reason)),
