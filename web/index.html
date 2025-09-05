@@ -619,25 +619,34 @@
         .date-range-labels {
             display: flex;
             justify-content: space-between;
-            font-size: 0.75em;
-            color: #666;
-            margin-top: 5px;
+            align-items: center;
+            font-size: 0.85em;
+            color: #495057;
+            margin-top: 8px;
         }
         .date-label {
             background: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 3px;
+            padding: 4px 10px;
+            border-radius: 4px;
             border: 1px solid #dee2e6;
+            font-weight: 500;
+            min-width: 60px;
+            text-align: center;
         }
         .clear-dates-btn {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 4px 10px;
             border-radius: 4px;
             font-size: 0.8em;
             cursor: pointer;
             transition: all 0.2s ease;
+            line-height: 1;
+            font-weight: 500;
+            min-width: 50px;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .clear-dates-btn:hover {
             background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
@@ -668,17 +677,23 @@
             min-width: 28px;
             text-align: center;
         }
-        .live-count {
+        .count-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 8px 12px;
-            margin: 8px 0;
-            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-            border-radius: 8px;
-            font-size: 0.85em;
-            color: #2c3e50;
-            text-align: center;
-            border: 1px solid rgba(63,81,181,0.1);
+            background: rgba(248, 249, 250, 0.8);
+            border-bottom: 1px solid #e9ecef;
+        }
+        .property-count {
+            font-size: 0.8em;
+            color: #6c757d;
             font-weight: 500;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .count-info .reset-button {
+            padding: 4px 8px;
+            font-size: 0.75em;
+            margin-left: 10px;
         }
         .lean-popup {
             background-color: white;
@@ -779,6 +794,10 @@
             </div>
             <button class="close-button" onclick="closeSidebar()">✕</button>
         </div>
+        <div id="count-info" class="count-info">
+            <span id="property-count" class="property-count">Loading...</span>
+            <button class="reset-button" onclick="resetView()">Reset</button>
+        </div>
         <div id="property-panel" class="panel active">
             <div id="property-list">
                 <div id="loading" class="loading">Loading property data...</div>
@@ -788,7 +807,6 @@
             <div class="filter-content">
                 <div class="filter-header">
                     <div class="filter-title">Filters</div>
-                    <button class="reset-button" onclick="resetView()">Reset</button>
                 </div>
                 <div class="filter-group">
                     <label>
@@ -841,10 +859,10 @@
                         </div>
                         <div class="date-range-labels">
                             <span id="date-range-start" class="date-label">All</span>
+                            <button id="clear-dates" class="clear-dates-btn" style="display: none;">Clear</button>
                             <span id="date-range-end" class="date-label">All</span>
                         </div>
                     </div>
-                    <button id="clear-dates" class="clear-dates-btn" style="margin-top: 8px;">Clear Range</button>
                 </div>
             </div>
         </div>
@@ -878,6 +896,7 @@
                 unknown: document.getElementById('filter-unknown').checked,
                 dateMinIndex: minDateIndex,
                 dateMaxIndex: maxDateIndex,
+                showOnlyVisible: showOnlyVisible,
                 timestamp: Date.now()
             };
             localStorage.setItem('laendlefinderFilters', JSON.stringify(filterSettings));
@@ -916,6 +935,40 @@
             }
             return null;
         }
+
+        // Local storage functions for panel state
+        function savePanelState() {
+            const panelState = {
+                sidebarCollapsed: sidebarCollapsed,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('laendlefinderPanelState', JSON.stringify(panelState));
+        }
+
+        function getStoredPanelState() {
+            try {
+                const stored = localStorage.getItem('laendlefinderPanelState');
+                if (stored) {
+                    const state = JSON.parse(stored);
+                    // Only use stored state if it's less than 30 days old
+                    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+                    if (Date.now() - state.timestamp < thirtyDaysInMs) {
+                        return state;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading stored panel state:', error);
+            }
+            return null;
+        }
+
+        function restorePanelState() {
+            if (!sidebarCollapsed) {
+                // If sidebar should be open, apply the open state immediately
+                openSidebar();
+            }
+            // If sidebarCollapsed is true, the default CSS handles the collapsed state
+        }
         
         // Initialize the map with stored position or default to Vorarlberg, Austria
         const storedPosition = getStoredMapPosition();
@@ -937,6 +990,7 @@
         let currentHighlightedMarker = null;
         let currentHighlightedProperty = null;
         let filteredProperties = [];
+        let displayedProperties = []; // Properties currently shown in the list
         let showOnlyVisible = false;
         let dateHistogramData = [];
         let sortedDates = [];
@@ -956,7 +1010,11 @@
                         allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
                         buildDateHistogram(); // Build histogram after data is loaded
                         updateFilterCounts();
-                        applyFilters(); // Use applyFilters instead of direct calls
+                        
+                        // Delay initial filtering to ensure map is fully positioned
+                        setTimeout(() => {
+                            applyFilters(); // Use applyFilters instead of direct calls
+                        }, 100);
                         const loadingElement = document.getElementById('loading');
                         if (loadingElement) {
                             loadingElement.style.display = 'none';
@@ -1183,21 +1241,32 @@
 
         // Function to update filter counts
         function updateFilterCounts() {
-            const availableCount = allProperties.filter(p => p.listing_type === 'available').length;
-            const soldCount = allProperties.filter(p => p.listing_type === 'sold').length;
-            const unavailableCount = allProperties.filter(p => p.listing_type === 'unavailable').length;
-            const apartmentCount = allProperties.filter(p => p.property_type === 'apartment').length;
-            const houseCount = allProperties.filter(p => p.property_type === 'house').length;
-            const landCount = allProperties.filter(p => p.property_type === 'land').length;
-            const unknownCount = allProperties.filter(p => p.property_type === 'unknown').length;
+            // Count total properties by category
+            const totalAvailable = allProperties.filter(p => p.listing_type === 'available').length;
+            const totalSold = allProperties.filter(p => p.listing_type === 'sold').length;
+            const totalUnavailable = allProperties.filter(p => p.listing_type === 'unavailable').length;
+            const totalApartment = allProperties.filter(p => p.property_type === 'apartment').length;
+            const totalHouse = allProperties.filter(p => p.property_type === 'house').length;
+            const totalLand = allProperties.filter(p => p.property_type === 'land').length;
+            const totalUnknown = allProperties.filter(p => p.property_type === 'unknown').length;
             
-            document.getElementById('available-count').textContent = `(${availableCount})`;
-            document.getElementById('sold-count').textContent = `(${soldCount})`;
-            document.getElementById('unavailable-count').textContent = `(${unavailableCount})`;
-            document.getElementById('apartment-count').textContent = `(${apartmentCount})`;
-            document.getElementById('house-count').textContent = `(${houseCount})`;
-            document.getElementById('land-count').textContent = `(${landCount})`;
-            document.getElementById('unknown-count').textContent = `(${unknownCount})`;
+            // Count visible properties by category (from displayedProperties - what's actually shown in the list)
+            const visibleAvailable = displayedProperties.filter(p => p.listing_type === 'available').length;
+            const visibleSold = displayedProperties.filter(p => p.listing_type === 'sold').length;
+            const visibleUnavailable = displayedProperties.filter(p => p.listing_type === 'unavailable').length;
+            const visibleApartment = displayedProperties.filter(p => p.property_type === 'apartment').length;
+            const visibleHouse = displayedProperties.filter(p => p.property_type === 'house').length;
+            const visibleLand = displayedProperties.filter(p => p.property_type === 'land').length;
+            const visibleUnknown = displayedProperties.filter(p => p.property_type === 'unknown').length;
+            
+            // Update counts in visible/total format
+            document.getElementById('available-count').textContent = `(${visibleAvailable}/${totalAvailable})`;
+            document.getElementById('sold-count').textContent = `(${visibleSold}/${totalSold})`;
+            document.getElementById('unavailable-count').textContent = `(${visibleUnavailable}/${totalUnavailable})`;
+            document.getElementById('apartment-count').textContent = `(${visibleApartment}/${totalApartment})`;
+            document.getElementById('house-count').textContent = `(${visibleHouse}/${totalHouse})`;
+            document.getElementById('land-count').textContent = `(${visibleLand}/${totalLand})`;
+            document.getElementById('unknown-count').textContent = `(${visibleUnknown}/${totalUnknown})`;
         }
 
         // Function to display properties in the list
@@ -1205,18 +1274,19 @@
             const listContainer = document.getElementById('property-list');
             listContainer.innerHTML = '';
             propertyElements = []; // Clear previous property elements
+            displayedProperties = properties; // Track currently displayed properties
+            
+            // Update the count in the sidebar header
+            const propertyCountElement = document.getElementById('property-count');
+            if (propertyCountElement) {
+                propertyCountElement.textContent = `${properties.length} out of ${allProperties.length} properties`;
+            }
             
             // Handle empty results
             if (properties.length === 0) {
                 listContainer.innerHTML = '<div class="loading">No properties match the current filters</div>';
                 return;
             }
-            
-            // Add live count at the top
-            const liveCount = document.createElement('div');
-            liveCount.className = 'live-count';
-            liveCount.textContent = `${properties.length} out of ${filteredProperties.length} visible`;
-            listContainer.appendChild(liveCount);
             
             // Sort properties by date (newest first)
             const sortedProperties = properties.slice().sort((a, b) => {
@@ -1357,14 +1427,17 @@
             `;
         }
 
-        // Function to build date histogram
-        function buildDateHistogram() {
+        // Function to build date histogram from specific properties
+        function buildDateHistogram(properties = null) {
+            // Use provided properties, or fall back to allProperties for initial load
+            const propertiesForHistogram = properties || allProperties;
+            
             // Collect all valid dates from properties, filtering out invalid dates
             const dates = [];
             const today = new Date();
             const earliestValidDate = new Date('2000-01-01'); // Reasonable earliest date
             
-            allProperties.forEach(property => {
+            propertiesForHistogram.forEach(property => {
                 if (property.date && property.date.trim() !== '') {
                     const date = new Date(property.date);
                     // Filter out invalid dates and dates that are clearly wrong
@@ -1520,16 +1593,21 @@
         function updateDateLabels() {
             const startLabel = document.getElementById('date-range-start');
             const endLabel = document.getElementById('date-range-end');
+            const clearButton = document.getElementById('clear-dates');
             
             if (dateHistogramData.length === 0) {
                 startLabel.textContent = 'No dates';
                 endLabel.textContent = 'No dates';
+                clearButton.style.display = 'none';
                 return;
             }
             
-            if (minDateIndex === 0 && maxDateIndex === dateHistogramData.length - 1) {
+            const isFullRange = minDateIndex === 0 && maxDateIndex === dateHistogramData.length - 1;
+            
+            if (isFullRange) {
                 startLabel.textContent = 'All';
                 endLabel.textContent = 'All';
+                clearButton.style.display = 'none';
             } else {
                 // Ensure indices are within bounds
                 const safeMinIndex = Math.max(0, Math.min(minDateIndex, dateHistogramData.length - 1));
@@ -1546,6 +1624,39 @@
                     startLabel.textContent = 'Invalid';
                     endLabel.textContent = 'Invalid';
                 }
+                clearButton.style.display = 'inline-block';
+            }
+        }
+
+        // Function to update histogram for specific set of properties
+        function updateHistogramForProperties(properties) {
+            // Save current slider positions and check if range was at full extent
+            const currentMinIndex = minDateIndex;
+            const currentMaxIndex = maxDateIndex;
+            const oldLength = dateHistogramData.length;
+            const wasFullRange = (currentMinIndex === 0 && currentMaxIndex === oldLength - 1);
+            
+            // Build new histogram
+            buildDateHistogram(properties);
+            
+            // Handle slider positioning after histogram rebuild
+            if (dateHistogramData.length > 0) {
+                if (wasFullRange || oldLength === 0) {
+                    // If the range was at full extent or this is the first build, keep it at full extent
+                    minDateIndex = 0;
+                    maxDateIndex = dateHistogramData.length - 1;
+                } else {
+                    // Keep proportional position if range was restricted
+                    const minRatio = oldLength > 1 ? currentMinIndex / Math.max(1, oldLength - 1) : 0;
+                    const maxRatio = oldLength > 1 ? currentMaxIndex / Math.max(1, oldLength - 1) : 1;
+                    
+                    minDateIndex = Math.floor(minRatio * (dateHistogramData.length - 1));
+                    maxDateIndex = Math.floor(maxRatio * (dateHistogramData.length - 1));
+                    
+                    // Ensure valid bounds
+                    minDateIndex = Math.max(0, Math.min(minDateIndex, dateHistogramData.length - 1));
+                    maxDateIndex = Math.max(minDateIndex, Math.min(maxDateIndex, dateHistogramData.length - 1));
+                }
             }
         }
 
@@ -1559,7 +1670,40 @@
             const showLand = document.getElementById('filter-land').checked;
             const showUnknown = document.getElementById('filter-unknown').checked;
             
-            // Get date filter range from histogram slider
+            // Save filter settings to local storage
+            saveFilterSettings();
+            
+            // First, apply non-date filters to get base set
+            let baseFilteredProperties = allProperties.filter(property => {
+                // Filter by listing type
+                if (property.listing_type === 'available' && !showAvailable) return false;
+                if (property.listing_type === 'sold' && !showSold) return false;
+                if (property.listing_type === 'unavailable' && !showUnavailable) return false;
+                
+                // Filter by property type
+                if (property.property_type === 'apartment' && !showApartment) return false;
+                if (property.property_type === 'house' && !showHouse) return false;
+                if (property.property_type === 'land' && !showLand) return false;
+                if (property.property_type === 'unknown' && !showUnknown) return false;
+                
+                return true;
+            });
+            
+            // Apply map visibility filter if enabled
+            if (showOnlyVisible && map) {
+                const bounds = map.getBounds();
+                baseFilteredProperties = baseFilteredProperties.filter(property => {
+                    if (!property.coordinates) return false;
+                    const coords = property.coordinates.split(',').map(coord => parseFloat(coord.trim()));
+                    if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) return false;
+                    return bounds.contains([coords[0], coords[1]]);
+                });
+            }
+            
+            // Update histogram based on visible properties (non-date filtered)
+            updateHistogramForProperties(baseFilteredProperties);
+            
+            // Get date filter range from updated histogram slider
             const hasDateFilter = minDateIndex > 0 || maxDateIndex < dateHistogramData.length - 1;
             let startDate = null;
             let endDate = null;
@@ -1572,21 +1716,8 @@
                 endDate.setHours(23, 59, 59, 999); // End of day
             }
             
-            // Save filter settings to local storage
-            saveFilterSettings();
-            
-            filteredProperties = allProperties.filter(property => {
-                // Filter by listing type
-                if (property.listing_type === 'available' && !showAvailable) return false;
-                if (property.listing_type === 'sold' && !showSold) return false;
-                if (property.listing_type === 'unavailable' && !showUnavailable) return false;
-                
-                // Filter by property type
-                if (property.property_type === 'apartment' && !showApartment) return false;
-                if (property.property_type === 'house' && !showHouse) return false;
-                if (property.property_type === 'land' && !showLand) return false;
-                if (property.property_type === 'unknown' && !showUnknown) return false;
-                
+            // Now apply date filters to get final result
+            filteredProperties = baseFilteredProperties.filter(property => {
                 // Filter by date range from histogram slider
                 if (hasDateFilter) {
                     if (property.date) {
@@ -1604,13 +1735,10 @@
             });
             
             displayProperties(filteredProperties);
+            displayPropertyList(filteredProperties);
             
-            // Filter list based on visibility
-            if (showOnlyVisible) {
-                filterListByVisibleMarkers();
-            } else {
-                displayPropertyList(filteredProperties);
-            }
+            // Update filter counts to show visible/total
+            updateFilterCounts();
         }
         
         // Function to filter list to only show properties with visible markers
@@ -1635,6 +1763,9 @@
             }
             
             displayPropertyList(visibleProperties);
+            
+            // Update filter counts to reflect what's actually displayed
+            updateFilterCounts();
             
             // Re-establish highlighting after the list is rebuilt
             if (highlightedPropertyData) {
@@ -1686,7 +1817,6 @@
             updateSliderRangeFill();
             
             applyFilters(); // Refresh the display
-            closeSidebar(); // Close the panel after reset
         }
 
         // Function to highlight a property in the list when its marker is clicked
@@ -1814,7 +1944,8 @@
             saveMapPosition(center.lat, center.lng, zoom);
             
             if (showOnlyVisible) {
-                filterListByVisibleMarkers();
+                // Re-apply all filters including the new map bounds
+                applyFilters();
             }
         });
 
@@ -1822,11 +1953,14 @@
         map.on('dragstart zoomstart', function() {
             if (!showOnlyVisible) {
                 showOnlyVisible = true;
+                saveFilterSettings(); // Save the change in visible mode
             }
         });
 
         // Sidebar toggle functionality
-        let sidebarCollapsed = true;
+        // Initialize sidebar state from local storage or default to collapsed
+        const storedPanelState = getStoredPanelState();
+        let sidebarCollapsed = storedPanelState ? storedPanelState.sidebarCollapsed : true;
         
         function openSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -1839,6 +1973,9 @@
             mapElement.classList.add('sidebar-open');
             listToggle.classList.remove('collapsed');
             filterToggle.classList.remove('collapsed');
+            
+            // Save panel state to local storage
+            savePanelState();
             
             // Trigger map resize after animation completes
             setTimeout(() => {
@@ -1857,6 +1994,9 @@
             mapElement.classList.remove('sidebar-open');
             listToggle.classList.add('collapsed');
             filterToggle.classList.add('collapsed');
+            
+            // Save panel state to local storage
+            savePanelState();
             
             // Trigger map resize after animation completes
             setTimeout(() => {
@@ -1933,6 +2073,11 @@
                     minDateIndex = storedSettings.dateMinIndex;
                     maxDateIndex = storedSettings.dateMaxIndex;
                     // Update will happen when histogram is built
+                }
+                
+                // Restore showOnlyVisible state
+                if (storedSettings.showOnlyVisible !== undefined) {
+                    showOnlyVisible = storedSettings.showOnlyVisible;
                 }
             }
         }
@@ -2038,6 +2183,7 @@
         // Load the CSV data when the page loads
         document.addEventListener('DOMContentLoaded', function() {
             restoreFilterSettings(); // Restore saved filter settings first
+            restorePanelState(); // Restore saved panel state
             loadCSVData();
             setupFilterListeners();
         });
