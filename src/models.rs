@@ -7,6 +7,7 @@ use std::fmt;
 pub enum ListingType {
     Available,
     Sold,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,6 +23,7 @@ impl fmt::Display for ListingType {
         match self {
             ListingType::Available => write!(f, "available"),
             ListingType::Sold => write!(f, "sold"),
+            ListingType::Unavailable => write!(f, "unavailable"),
         }
     }
 }
@@ -55,6 +57,7 @@ impl<'de> Deserialize<'de> for ListingType {
         match s.as_str() {
             "available" => Ok(ListingType::Available),
             "sold" => Ok(ListingType::Sold),
+            "unavailable" => Ok(ListingType::Unavailable),
             _ => Err(serde::de::Error::custom(format!(
                 "Invalid listing type: {}",
                 s

@@ -201,8 +201,21 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         .send()
         .context("Failed to fetch property page")?;
 
+    // Check for archived/unavailable properties
+    let final_url = response.url().to_string();
+    debug_println!("Final URL after redirects: {}", final_url);
+    
     let body = response.text().context("Failed to read response body")?;
     let document = Html::parse_document(&body);
+    
+    // Detect if property is unavailable (archived)
+    let is_unavailable = final_url.contains("archiviert") || 
+                        body.contains("Diese Anzeige ist leider nicht mehr aktiv");
+    
+    if is_unavailable {
+        debug_println!("Property is unavailable/archived");
+        return create_unavailable_property(url, &body, &document, None);
+    }
 
     // Try to extract from JSON-LD first (most reliable)
     if let Ok(json_data) = extract_from_json_ld(&body, url) {
@@ -804,4 +817,59 @@ fn parse_date_string(date_str: &str) -> Option<NaiveDate> {
     }
 
     None
+}
+
+fn create_unavailable_property(original_url: &str, body: &str, document: &Html, existing_property: Option<&Property>) -> Result<Property> {
+    debug_println!("Creating unavailable property for URL: {}", original_url);
+    
+    let now = chrono::Utc::now().naive_utc().date();
+    
+    // If we have existing property data, preserve it and only update status and last_seen
+    if let Some(existing) = existing_property {
+        debug_println!("Preserving existing property data, only updating to unavailable status");
+        return Ok(Property {
+            url: sanitize_url(original_url),
+            name: existing.name.clone(),
+            price: existing.price.clone(),
+            location: existing.location.clone(),
+            property_type: existing.property_type.clone(),
+            listing_type: ListingType::Unavailable,
+            date: existing.date,
+            coordinates: existing.coordinates,
+            address: existing.address.clone(),
+            size_living: existing.size_living.clone(),
+            size_ground: existing.size_ground.clone(),
+            first_seen: existing.first_seen,
+            last_seen: Some(now),
+        });
+    }
+    
+    // If no existing property data, extract what we can from the archived page
+    let name = extract_title(document).unwrap_or_else(|_| "Unavailable Property".to_string());
+    let location = extract_location(document, original_url).unwrap_or_else(|_| "Unknown".to_string());
+    let property_type = extract_property_type(document, original_url);
+    
+    // Try to extract date when it was archived/made unavailable
+    let date = extract_date_from_html(body);
+    
+    debug_println!(
+        "Created unavailable property from archived page: name={}, location={}, type={}",
+        name, location, property_type
+    );
+    
+    Ok(Property {
+        url: sanitize_url(original_url),
+        name,
+        price: "Unavailable".to_string(),
+        location,
+        property_type,
+        listing_type: ListingType::Unavailable,
+        date,
+        coordinates: None,
+        address: None,
+        size_living: None,
+        size_ground: None,
+        first_seen: Some(now),
+        last_seen: Some(now),
+    })
 }

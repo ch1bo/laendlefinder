@@ -1,4 +1,4 @@
-use crate::models::Property;
+use crate::models::{Property, PropertyType, ListingType};
 use crate::tui::ScraperTUI;
 use crate::utils;
 use crate::{debug, debug_println};
@@ -61,7 +61,8 @@ pub fn scrape_single_url<T: PlatformScraper>(
     let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
     tui.show_summary(all_properties.len())?;
 
-    // 2. Remove existing entry with the same URL if it exists
+    // 2. Find and temporarily store existing entry with the same URL if it exists
+    let existing_property = all_properties.iter().find(|p| p.url == url).cloned();
     let existing_count = all_properties.len();
     all_properties.retain(|p| p.url != url);
     let removed_count = existing_count - all_properties.len();
@@ -75,25 +76,36 @@ pub fn scrape_single_url<T: PlatformScraper>(
     tui.start_scraping_property(url)?;
 
     let mut failed_urls = Vec::new();
+    let mut final_properties = all_properties.clone();
     
     match scraper.scrape_property(url, options.cookies.as_deref()) {
         Ok(property) => {
-            all_properties.push(property);
+            // Re-add existing property if it was found, so deduplication can merge properly
+            if let Some(existing) = existing_property {
+                final_properties.push(existing);
+            }
+            final_properties.push(property);
+            
+            // Use deduplication logic to properly handle unavailable transitions
+            let deduplicated = deduplicate_properties_by_url(final_properties);
+            
             tui.complete_property(url)?;
             debug_println!("Successfully scraped and updated: {}", url);
             
             // Save immediately after successful scrape
-            utils::save_properties_to_csv(&all_properties, &options.output_file)?;
+            utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
+            
+            // Show final summary
+            tui.show_final_summary(1, deduplicated.len())?;
         }
         Err(e) => {
             failed_urls.push((url.to_string(), e.to_string()));
             tui.fail_property(url)?;
-            // Continue to show summary instead of returning early
+            
+            // Show final summary even on failure
+            tui.show_final_summary(0, all_properties.len())?;
         }
     }
-
-    // Show final summary
-    tui.show_final_summary(1, all_properties.len())?;
 
     // Show failure report if there were any failures
     tui.show_failure_report(&failed_urls)?;
@@ -323,23 +335,46 @@ pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property>
     for property in properties {
         match property_map.get(&property.url) {
             Some(existing) => {
-                // Property already exists, merge the tracking dates
-                let merged_property = Property {
-                    url: property.url.clone(),
-                    name: property.name,
-                    price: property.price,
-                    location: property.location,
-                    property_type: property.property_type,
-                    listing_type: property.listing_type,
-                    date: property.date,
-                    coordinates: property.coordinates,
-                    address: property.address,
-                    size_living: property.size_living,
-                    size_ground: property.size_ground,
-                    // Keep the earliest first_seen date
-                    first_seen: existing.first_seen.or(property.first_seen),
-                    // Use the latest last_seen date
-                    last_seen: property.last_seen.or(existing.last_seen),
+                // Property already exists, merge the data intelligently
+                let merged_property = if property.listing_type == ListingType::Unavailable && existing.listing_type != ListingType::Unavailable {
+                    // Property became unavailable - preserve all existing data except status and dates
+                    debug_println!("Property became unavailable, preserving existing data: {}", property.url);
+                    Property {
+                        url: property.url.clone(),
+                        name: if existing.name != "Unknown Property" && existing.name != "Unavailable Property" { existing.name.clone() } else { property.name },
+                        price: if existing.price != "Unknown" && existing.price != "Unavailable" { existing.price.clone() } else { property.price },
+                        location: if existing.location != "Unknown" { existing.location.clone() } else { property.location },
+                        property_type: if existing.property_type != PropertyType::Unknown { existing.property_type.clone() } else { property.property_type },
+                        listing_type: property.listing_type, // Update to unavailable
+                        date: existing.date.or(property.date), // Preserve original listing date
+                        coordinates: existing.coordinates.or(property.coordinates),
+                        address: existing.address.clone().or(property.address),
+                        size_living: existing.size_living.clone().or(property.size_living),
+                        size_ground: existing.size_ground.clone().or(property.size_ground),
+                        // Keep the earliest first_seen date
+                        first_seen: existing.first_seen.or(property.first_seen),
+                        // Use the latest last_seen date
+                        last_seen: property.last_seen.or(existing.last_seen),
+                    }
+                } else {
+                    // Normal property update - use new data but preserve tracking dates
+                    Property {
+                        url: property.url.clone(),
+                        name: property.name,
+                        price: property.price,
+                        location: property.location,
+                        property_type: property.property_type,
+                        listing_type: property.listing_type,
+                        date: property.date,
+                        coordinates: property.coordinates,
+                        address: property.address,
+                        size_living: property.size_living,
+                        size_ground: property.size_ground,
+                        // Keep the earliest first_seen date
+                        first_seen: existing.first_seen.or(property.first_seen),
+                        // Use the latest last_seen date
+                        last_seen: property.last_seen.or(existing.last_seen),
+                    }
                 };
                 property_map.insert(property.url.clone(), merged_property);
             }
