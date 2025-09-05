@@ -1660,6 +1660,60 @@
             }
         }
 
+        // Function to update histogram bar heights without changing date bounds
+        function updateHistogramBarsOnly(properties) {
+            // If histogram hasn't been built yet, build it normally
+            if (dateHistogramData.length === 0) {
+                updateHistogramForProperties(properties);
+                return;
+            }
+            
+            // Count properties for each existing month bucket
+            const monthCounts = {};
+            const today = new Date();
+            const earliestValidDate = new Date('2000-01-01');
+            
+            properties.forEach(property => {
+                if (property.date && property.date.trim() !== '') {
+                    const date = new Date(property.date);
+                    if (!isNaN(date.getTime()) && 
+                        date >= earliestValidDate && 
+                        date <= today) {
+                        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+                    }
+                }
+            });
+            
+            // Update existing histogram data counts
+            dateHistogramData.forEach(data => {
+                const monthKey = `${data.date.getFullYear()}-${String(data.date.getMonth() + 1).padStart(2, '0')}`;
+                data.count = monthCounts[monthKey] || 0;
+            });
+            
+            // Re-render the histogram bars with new counts
+            renderDateHistogram();
+            updateHistogramSelection();
+        }
+
+        // Debounced filter function for date range changes
+        let filterDebounceTimer = null;
+        function debouncedApplyFilters() {
+            clearTimeout(filterDebounceTimer);
+            filterDebounceTimer = setTimeout(() => {
+                applyFilters();
+            }, 500);
+        }
+
+        // Debounced filter function for map pan/zoom changes
+        let mapFilterDebounceTimer = null;
+        function debouncedMapFilters() {
+            clearTimeout(mapFilterDebounceTimer);
+            mapFilterDebounceTimer = setTimeout(() => {
+                applyFilters();
+            }, 250);
+        }
+
         // Function to apply filters
         function applyFilters() {
             const showAvailable = document.getElementById('filter-available').checked;
@@ -1700,8 +1754,8 @@
                 });
             }
             
-            // Update histogram based on visible properties (non-date filtered)
-            updateHistogramForProperties(baseFilteredProperties);
+            // Update histogram bars based on visible properties, but keep date bounds stable
+            updateHistogramBarsOnly(baseFilteredProperties);
             
             // Get date filter range from updated histogram slider
             const hasDateFilter = minDateIndex > 0 || maxDateIndex < dateHistogramData.length - 1;
@@ -1944,8 +1998,8 @@
             saveMapPosition(center.lat, center.lng, zoom);
             
             if (showOnlyVisible) {
-                // Re-apply all filters including the new map bounds
-                applyFilters();
+                // Re-apply all filters including the new map bounds (debounced)
+                debouncedMapFilters();
             }
         });
 
@@ -2144,7 +2198,7 @@
                     updateHistogramSelection();
                     updateDateLabels();
                     updateSliderRangeFill();
-                    applyFilters();
+                    debouncedApplyFilters();
                 }
                 
                 minSlider.addEventListener('input', handleSliderChange.bind(minSlider));
