@@ -11,7 +11,7 @@ pub struct ScrapingOptions {
     pub output_file: String,
     pub max_pages: Option<usize>,
     pub max_items: Option<usize>,
-    pub refresh: bool,
+    pub refresh_days: Option<u32>,
     pub new: bool,
     pub cookies: Option<String>,
     pub debug: bool,
@@ -23,7 +23,7 @@ impl Default for ScrapingOptions {
             output_file: "properties.csv".to_string(),
             max_pages: None,
             max_items: None,
-            refresh: false,
+            refresh_days: None,
             new: true,
             cookies: None,
             debug: false,
@@ -140,17 +140,51 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         })
         .collect();
 
-    let urls_to_scrape = if options.refresh {
-        // In refresh mode, use existing URLs instead of gathering new ones
-        let existing_urls: Vec<String> = relevant_urls;
-
-        if existing_urls.is_empty() {
+    let urls_to_scrape = if let Some(refresh_days) = options.refresh_days {
+        // In refresh mode, filter and prioritize properties older than N days
+        let refresh_days = refresh_days.max(1); // Default to 1 day minimum
+        let cutoff_date = chrono::Utc::now().naive_utc().date() - chrono::Duration::days(refresh_days as i64);
+        
+        let mut relevant_properties: Vec<&Property> = all_properties
+            .iter()
+            .filter(|x| {
+                // Filter by platform URL
+                if !x.url.contains(scraper.base_url()) {
+                    return false;
+                }
+                // Filter by age - include properties without last_seen or with old last_seen
+                match x.last_seen {
+                    None => true, // Properties without last_seen should be refreshed
+                    Some(last_seen) => last_seen <= cutoff_date, // Properties older than cutoff
+                }
+            })
+            .collect();
+            
+        if relevant_properties.is_empty() {
+            debug_println!("Refresh mode: no properties older than {} days found", refresh_days);
             tui.update_listing_status(0, 0)?;
             return Ok(());
         }
-
-        tui.update_listing_status_refresh(0, existing_urls.len())?;
-        existing_urls
+        
+        // Sort by last_seen date (oldest first), then by first_seen for properties without last_seen
+        relevant_properties.sort_by(|a, b| {
+            match (a.last_seen, b.last_seen) {
+                (Some(a_date), Some(b_date)) => a_date.cmp(&b_date), // oldest first
+                (None, Some(_)) => std::cmp::Ordering::Less, // properties without last_seen come first
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => a.first_seen.cmp(&b.first_seen), // fallback to first_seen
+            }
+        });
+        
+        let prioritized_urls: Vec<String> = relevant_properties
+            .into_iter()
+            .map(|p| p.url.clone())
+            .collect();
+            
+        debug_println!("Refresh mode: found {} properties older than {} days (cutoff: {})", 
+                      prioritized_urls.len(), refresh_days, cutoff_date);
+        tui.update_listing_status_refresh(0, prioritized_urls.len())?;
+        prioritized_urls
     } else if options.new {
         // New mode: gather new links until no new ones found in 5 consecutive pages
         // Create a set of existing URLs for fast lookup
@@ -284,7 +318,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
                 current_properties.extend(newly_scraped.clone());
                 
                 // If in refresh mode, remove old versions of successfully scraped URLs
-                if options.refresh {
+                if options.refresh_days.is_some() {
                     let scraped_urls: HashSet<String> = newly_scraped.iter().map(|p| p.url.clone()).collect();
                     current_properties.retain(|p| !scraped_urls.contains(&p.url) || newly_scraped.iter().any(|np| np.url == p.url));
                 }
@@ -309,7 +343,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     let mut final_properties = all_properties.clone();
     final_properties.extend(newly_scraped.clone());
     
-    if options.refresh {
+    if options.refresh_days.is_some() {
         let scraped_urls: HashSet<String> = urls_to_scrape.iter().cloned().collect();
         final_properties.retain(|p| !scraped_urls.contains(&p.url));
         final_properties.extend(newly_scraped);

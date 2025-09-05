@@ -18,9 +18,9 @@ struct Args {
     #[clap(short = 'i', long)]
     max_items: Option<usize>,
     
-    /// Re-scrape already known URLs to refresh data
-    #[clap(short, long)]
-    refresh: bool,
+    /// Re-scrape already known URLs to refresh data older than N days (default: 1 day)
+    #[clap(short, long, value_name = "DAYS", num_args = 0..=1, default_missing_value = "1")]
+    refresh: Option<u32>,
     
     /// Scrape new URLs until no new ones found in 5 consecutive pages (default mode unless max-items is specified)
     #[clap(short, long)]
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     
     // Create scraping options
     // Use new mode by default, unless other flags are provided
-    let use_new_mode = if args.max_items.is_some() || args.max_pages.is_some() || args.refresh {
+    let use_new_mode = if args.max_items.is_some() || args.max_pages.is_some() || args.refresh.is_some() {
         args.new // Use explicit --new flag when other options are specified
     } else {
         true // Default to new mode when no specific options provided
@@ -46,7 +46,7 @@ fn main() -> Result<()> {
         output_file: args.output,
         max_pages: args.max_pages,
         max_items: args.max_items,
-        refresh: args.refresh,
+        refresh_days: args.refresh,
         new: use_new_mode,
         cookies: None, // laendleimmo doesn't use cookies
         debug: args.debug,
