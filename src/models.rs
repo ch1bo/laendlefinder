@@ -141,6 +141,8 @@ pub struct Property {
     pub address: Option<String>,
     pub size_living: Option<String>,
     pub size_ground: Option<String>,
+    pub first_seen: Option<NaiveDate>,
+    pub last_seen: Option<NaiveDate>,
 }
 
 // Custom serialization for Property to handle the coordinates tuple
@@ -149,7 +151,7 @@ impl Serialize for Property {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Property", 11)?;
+        let mut state = serializer.serialize_struct("Property", 13)?;
         state.serialize_field("url", &self.url)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("price", &self.price)?;
@@ -168,6 +170,8 @@ impl Serialize for Property {
         state.serialize_field("address", &self.address)?;
         state.serialize_field("size_living", &self.size_living)?;
         state.serialize_field("size_ground", &self.size_ground)?;
+        state.serialize_field("first_seen", &self.first_seen)?;
+        state.serialize_field("last_seen", &self.last_seen)?;
 
         state.end()
     }
@@ -193,6 +197,10 @@ impl<'de> Deserialize<'de> for Property {
             address: Option<String>,
             size_living: Option<String>,
             size_ground: Option<String>,
+            #[serde(default)]
+            first_seen: Option<NaiveDate>,
+            #[serde(default)]
+            last_seen: Option<NaiveDate>,
         }
 
         let helper = PropertyHelper::deserialize(deserializer)?;
@@ -224,6 +232,8 @@ impl<'de> Deserialize<'de> for Property {
             address: helper.address,
             size_living: helper.size_living,
             size_ground: helper.size_ground,
+            first_seen: helper.first_seen,
+            last_seen: helper.last_seen,
         })
     }
 }

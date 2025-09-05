@@ -342,6 +342,8 @@ pub fn scrape_property_page(
     );
 
     // Create and return the Property
+    let now = chrono::Utc::now().naive_utc().date();
+    
     Ok(Property {
         url: sanitize_url(url),
         name: headline,
@@ -354,6 +356,8 @@ pub fn scrape_property_page(
         address: None,
         size_living: None,
         size_ground: None,
+        first_seen: Some(now),
+        last_seen: Some(now),
     })
 }
 
@@ -462,6 +466,8 @@ fn extract_property_from_json(
     );
 
     // Create and return the Property
+    let now = chrono::Utc::now().naive_utc().date();
+    
     Ok(Property {
         url: sanitize_url(url),
         name: title.to_string(),
@@ -474,5 +480,7 @@ fn extract_property_from_json(
         address,
         size_living,
         size_ground,
+        first_seen: Some(now),
+        last_seen: Some(now),
     })
 }

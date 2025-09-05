@@ -3,6 +3,7 @@ use crate::tui::ScraperTUI;
 use crate::utils;
 use crate::{debug, debug_println};
 use anyhow::Result;
+use chrono;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -115,7 +116,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     let mut tui = ScraperTUI::new();
 
     // 1. Load all existing properties
-    let all_properties = utils::load_properties_from_csv(&options.output_file)?;
+    let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
     tui.show_summary(all_properties.len())?;
 
     let relevant_urls: Vec<String> = all_properties
@@ -150,6 +151,23 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
             return Ok(());
         }
 
+        // Update last_seen for existing properties that were found in listings
+        let now = chrono::Utc::now().naive_utc().date();
+        let mut updated_count = 0;
+        
+        for property in &mut all_properties {
+            if found_urls.contains(&property.url) && existing_urls.contains(&property.url) {
+                property.last_seen = Some(now);
+                updated_count += 1;
+            }
+        }
+        
+        // Save updated properties if any last_seen dates were updated
+        if updated_count > 0 {
+            let deduplicated = deduplicate_properties_by_url(all_properties.clone());
+            utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
+        }
+
         // Filter out existing URLs in normal mode
         let mut new_urls = Vec::new();
         let mut known_count = 0;
@@ -179,6 +197,23 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         if found_urls.is_empty() {
             tui.update_listing_status(0, 0)?;
             return Ok(());
+        }
+
+        // Update last_seen for existing properties that were found in listings
+        let now = chrono::Utc::now().naive_utc().date();
+        let mut updated_count = 0;
+        
+        for property in &mut all_properties {
+            if found_urls.contains(&property.url) && existing_urls.contains(&property.url) {
+                property.last_seen = Some(now);
+                updated_count += 1;
+            }
+        }
+        
+        // Save updated properties if any last_seen dates were updated
+        if updated_count > 0 {
+            let deduplicated = deduplicate_properties_by_url(all_properties.clone());
+            utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
         }
 
         // Filter out existing URLs in normal mode
@@ -279,21 +314,45 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     Ok(())
 }
 
-/// Deduplicate properties by URL, keeping the last occurrence (most recent data)
+/// Deduplicate properties by URL, merging first_seen/last_seen dates properly
 pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property> {
-    let mut seen_urls = HashSet::new();
-    let mut deduplicated = Vec::new();
-
-    // Process in reverse order so we keep the last (most recent) occurrence of each URL
-    for property in properties.into_iter().rev() {
-        if seen_urls.insert(property.url.clone()) {
-            deduplicated.push(property);
+    use std::collections::HashMap;
+    
+    let mut property_map: HashMap<String, Property> = HashMap::new();
+    
+    for property in properties {
+        match property_map.get(&property.url) {
+            Some(existing) => {
+                // Property already exists, merge the tracking dates
+                let merged_property = Property {
+                    url: property.url.clone(),
+                    name: property.name,
+                    price: property.price,
+                    location: property.location,
+                    property_type: property.property_type,
+                    listing_type: property.listing_type,
+                    date: property.date,
+                    coordinates: property.coordinates,
+                    address: property.address,
+                    size_living: property.size_living,
+                    size_ground: property.size_ground,
+                    // Keep the earliest first_seen date
+                    first_seen: existing.first_seen.or(property.first_seen),
+                    // Use the latest last_seen date
+                    last_seen: property.last_seen.or(existing.last_seen),
+                };
+                property_map.insert(property.url.clone(), merged_property);
+            }
+            None => {
+                // New property, just insert it
+                property_map.insert(property.url.clone(), property);
+            }
         }
     }
-
-    // Reverse back to maintain original order
-    deduplicated.reverse();
-    deduplicated
+    
+    // Convert back to Vec, maintaining insertion order is less important here
+    // since we're dealing with different URLs
+    property_map.into_values().collect()
 }
 
 // Legacy functions for backwards compatibility

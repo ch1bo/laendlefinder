@@ -229,6 +229,8 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         price, location, property_type, name, date
     );
 
+    let now = chrono::Utc::now().naive_utc().date();
+    
     Ok(Property {
         url: sanitize_url(url),
         name,
@@ -241,6 +243,8 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         address,
         size_living,
         size_ground,
+        first_seen: Some(now),
+        last_seen: Some(now),
     })
 }
 
@@ -564,6 +568,8 @@ fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
         price, location, property_type, name, date
     );
 
+    let now = chrono::Utc::now().naive_utc().date();
+    
     Ok(Property {
         url: sanitize_url(url),
         name: name.to_string(),
@@ -576,6 +582,8 @@ fn extract_from_json_ld(body: &str, url: &str) -> Result<Property> {
         address,
         size_living,
         size_ground,
+        first_seen: Some(now),
+        last_seen: Some(now),
     })
 }
 
