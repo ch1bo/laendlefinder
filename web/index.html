@@ -186,6 +186,20 @@
         .property-item.sold {
             border-left-color: #dc3545;
         }
+        .property-item.unavailable {
+            border-left-color: #6c757d;
+            background-color: #f8f9fa;
+            opacity: 0.85;
+        }
+        .property-item.unavailable .property-title {
+            color: #6c757d;
+        }
+        .property-item.unavailable .property-price {
+            color: #6c757d;
+        }
+        .property-item.unavailable .property-location {
+            color: #868e96;
+        }
         .property-item:hover {
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             cursor: pointer;
@@ -520,6 +534,10 @@
             background-color: #f5e8e8;
             color: #5f2c2c;
         }
+        .listing-type-unavailable {
+            background-color: #e9ecef;
+            color: #6c757d;
+        }
         .details-button {
             background-color: #007bff;
             color: white;
@@ -577,6 +595,11 @@
                         <span id="sold-label">Sold Properties</span>
                         <span id="sold-count" class="filter-count"></span>
                     </label>
+                    <label>
+                        <input type="checkbox" id="filter-unavailable" checked> 
+                        <span id="unavailable-label">Unavailable Properties</span>
+                        <span id="unavailable-count" class="filter-count"></span>
+                    </label>
                 </div>
                 <div class="filter-group">
                     <div class="filter-title" style="font-size: 0.9em; margin-bottom: 8px;">Property Types</div>
@@ -626,6 +649,7 @@
             const filterSettings = {
                 available: document.getElementById('filter-available').checked,
                 sold: document.getElementById('filter-sold').checked,
+                unavailable: document.getElementById('filter-unavailable').checked,
                 apartment: document.getElementById('filter-apartment').checked,
                 house: document.getElementById('filter-house').checked,
                 land: document.getElementById('filter-land').checked,
@@ -746,7 +770,12 @@
                     }
                     
                     // Choose marker color based on listing type
-                    const markerColor = property.listing_type === 'sold' ? '#ff0000' : '#28a745';
+                    let markerColor = '#28a745'; // default green for available
+                    if (property.listing_type === 'sold') {
+                        markerColor = '#ff0000'; // red for sold
+                    } else if (property.listing_type === 'unavailable') {
+                        markerColor = '#6c757d'; // gray for unavailable
+                    }
                     
                     // Create lightweight CircleMarker (hardware accelerated)
                     const marker = L.circleMarker([coords[0], coords[1]], {
@@ -927,6 +956,7 @@
         function updateFilterCounts() {
             const availableCount = allProperties.filter(p => p.listing_type === 'available').length;
             const soldCount = allProperties.filter(p => p.listing_type === 'sold').length;
+            const unavailableCount = allProperties.filter(p => p.listing_type === 'unavailable').length;
             const apartmentCount = allProperties.filter(p => p.property_type === 'apartment').length;
             const houseCount = allProperties.filter(p => p.property_type === 'house').length;
             const landCount = allProperties.filter(p => p.property_type === 'land').length;
@@ -934,6 +964,7 @@
             
             document.getElementById('available-count').textContent = `(${availableCount})`;
             document.getElementById('sold-count').textContent = `(${soldCount})`;
+            document.getElementById('unavailable-count').textContent = `(${unavailableCount})`;
             document.getElementById('apartment-count').textContent = `(${apartmentCount})`;
             document.getElementById('house-count').textContent = `(${houseCount})`;
             document.getElementById('land-count').textContent = `(${landCount})`;
@@ -1101,6 +1132,7 @@
         function applyFilters() {
             const showAvailable = document.getElementById('filter-available').checked;
             const showSold = document.getElementById('filter-sold').checked;
+            const showUnavailable = document.getElementById('filter-unavailable').checked;
             const showApartment = document.getElementById('filter-apartment').checked;
             const showHouse = document.getElementById('filter-house').checked;
             const showLand = document.getElementById('filter-land').checked;
@@ -1113,6 +1145,7 @@
                 // Filter by listing type
                 if (property.listing_type === 'available' && !showAvailable) return false;
                 if (property.listing_type === 'sold' && !showSold) return false;
+                if (property.listing_type === 'unavailable' && !showUnavailable) return false;
                 
                 // Filter by property type
                 if (property.property_type === 'apartment' && !showApartment) return false;
@@ -1189,6 +1222,7 @@
             // Reset all filters to checked state
             document.getElementById('filter-available').checked = true;
             document.getElementById('filter-sold').checked = true;
+            document.getElementById('filter-unavailable').checked = true;
             document.getElementById('filter-apartment').checked = true;
             document.getElementById('filter-house').checked = true;
             document.getElementById('filter-land').checked = true;
@@ -1233,7 +1267,12 @@
         function highlightMarker(property) {
             // Clear previous marker highlighting by restoring original style
             if (currentHighlightedMarker) {
-                const originalColor = currentHighlightedMarker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745';
+                let originalColor = '#28a745'; // default green for available
+                if (currentHighlightedMarker.propertyData.listing_type === 'sold') {
+                    originalColor = '#ff0000'; // red for sold
+                } else if (currentHighlightedMarker.propertyData.listing_type === 'unavailable') {
+                    originalColor = '#6c757d'; // gray for unavailable
+                }
                 currentHighlightedMarker.setStyle({
                     radius: 8,
                     fillColor: originalColor,
@@ -1249,9 +1288,15 @@
             
             if (marker) {
                 // Highlight the marker by increasing size and changing border
+                let markerColor = '#28a745'; // default green for available
+                if (marker.propertyData.listing_type === 'sold') {
+                    markerColor = '#ff0000'; // red for sold
+                } else if (marker.propertyData.listing_type === 'unavailable') {
+                    markerColor = '#6c757d'; // gray for unavailable
+                }
                 marker.setStyle({
                     radius: 10,
-                    fillColor: marker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745',
+                    fillColor: markerColor,
                     color: '#ffc107', // Yellow border for highlighting
                     weight: 3,
                     opacity: 1,
@@ -1279,7 +1324,12 @@
             
             // Clear marker highlighting
             if (currentHighlightedMarker) {
-                const originalColor = currentHighlightedMarker.propertyData.listing_type === 'sold' ? '#ff0000' : '#28a745';
+                let originalColor = '#28a745'; // default green for available
+                if (currentHighlightedMarker.propertyData.listing_type === 'sold') {
+                    originalColor = '#ff0000'; // red for sold
+                } else if (currentHighlightedMarker.propertyData.listing_type === 'unavailable') {
+                    originalColor = '#6c757d'; // gray for unavailable
+                }
                 currentHighlightedMarker.setStyle({
                     radius: 8,
                     fillColor: originalColor,
@@ -1413,6 +1463,9 @@
             if (storedSettings) {
                 document.getElementById('filter-available').checked = storedSettings.available;
                 document.getElementById('filter-sold').checked = storedSettings.sold;
+                if (storedSettings.unavailable !== undefined) {
+                    document.getElementById('filter-unavailable').checked = storedSettings.unavailable;
+                }
                 document.getElementById('filter-apartment').checked = storedSettings.apartment;
                 document.getElementById('filter-house').checked = storedSettings.house;
                 document.getElementById('filter-land').checked = storedSettings.land;
@@ -1423,7 +1476,7 @@
         // Add automatic filter event listeners
         function setupFilterListeners() {
             const filterIds = [
-                'filter-available', 'filter-sold', 
+                'filter-available', 'filter-sold', 'filter-unavailable',
                 'filter-apartment', 'filter-house', 'filter-land', 'filter-unknown'
             ];
             
