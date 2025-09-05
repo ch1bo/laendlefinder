@@ -443,6 +443,212 @@
             box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
         }
         
+        /* Date histogram and slider styling */
+        .date-histogram-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .date-histogram {
+            height: 60px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            position: relative;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .histogram-bar {
+            position: absolute;
+            bottom: 0;
+            background: linear-gradient(to top, #007bff 0%, #66b3ff 100%);
+            border-radius: 1px 1px 0 0;
+            transition: opacity 0.2s ease;
+        }
+        .histogram-bar.dimmed {
+            opacity: 0.3;
+        }
+        .histogram-bar.selected {
+            opacity: 1;
+        }
+        .histogram-bar.empty-month {
+            opacity: 0.2;
+        }
+        .date-slider-container {
+            position: relative;
+            height: 25px;
+            margin: 10px 0;
+            background: #dee2e6;
+            border-radius: 2px;
+        }
+        
+        .slider-range-fill {
+            position: absolute;
+            height: 4px;
+            background: linear-gradient(90deg, #28a745 0%, #007bff 100%);
+            border-radius: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: all 0.1s ease;
+            z-index: 0;
+        }
+        
+        /* Base slider styling */
+        .date-slider {
+            position: absolute;
+            width: 100%;
+            height: 25px;
+            background: transparent;
+            appearance: none;
+            cursor: pointer;
+            z-index: 1;
+        }
+        
+        /* Ensure both sliders are accessible */
+        #date-slider-min {
+            z-index: 1;
+        }
+        
+        #date-slider-min::-webkit-slider-thumb {
+            pointer-events: all;
+        }
+        
+        #date-slider-min::-moz-range-thumb {
+            pointer-events: all;
+        }
+        
+        #date-slider-max {
+            z-index: 2;
+            /* Make the max slider's track non-interactive except for the thumb */
+            pointer-events: none;
+        }
+        
+        #date-slider-max::-webkit-slider-thumb {
+            pointer-events: all;
+        }
+        
+        #date-slider-max::-moz-range-thumb {
+            pointer-events: all;
+        }
+        
+        /* Webkit (Chrome/Safari) styling */
+        .date-slider::-webkit-slider-track {
+            height: 4px;
+            background: transparent;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        
+        .date-slider::-webkit-slider-thumb {
+            appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 3px solid white;
+            margin-top: -8px; /* Center on track */
+            transition: all 0.2s ease;
+        }
+        
+        .date-slider::-webkit-slider-thumb:hover {
+            background: #0056b3;
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+        
+        .date-slider::-webkit-slider-thumb:active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        
+        /* Firefox styling */
+        .date-slider::-moz-range-track {
+            height: 4px;
+            background: transparent;
+            border-radius: 2px;
+            border: none;
+        }
+        
+        .date-slider::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .date-slider::-moz-range-thumb:hover {
+            background: #0056b3;
+            transform: scale(1.15);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+        
+        .date-slider::-moz-range-thumb:active {
+            transform: scale(1.05);
+        }
+        
+        /* Differentiate the handles visually */
+        #date-slider-min::-webkit-slider-thumb {
+            background: #28a745; /* Green for min */
+        }
+        
+        #date-slider-min::-webkit-slider-thumb:hover {
+            background: #1e7e34;
+        }
+        
+        #date-slider-min::-moz-range-thumb {
+            background: #28a745;
+        }
+        
+        #date-slider-min::-moz-range-thumb:hover {
+            background: #1e7e34;
+        }
+        
+        /* Blue stays for max handle */
+        #date-slider-max::-webkit-slider-thumb {
+            background: #007bff;
+        }
+        
+        #date-slider-max::-webkit-slider-thumb:hover {
+            background: #0056b3;
+        }
+        .date-range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .date-label {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #dee2e6;
+        }
+        .clear-dates-btn {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .clear-dates-btn:hover {
+            background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .clear-dates-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
         /* Label text styling */
         .filter-group label span:first-of-type {
             flex: 1;
@@ -624,6 +830,22 @@
                         <span id="unknown-count" class="filter-count"></span>
                     </label>
                 </div>
+                <div class="filter-group">
+                    <div class="filter-title" style="font-size: 0.9em; margin-bottom: 8px;">Date Range</div>
+                    <div class="date-histogram-container">
+                        <div id="date-histogram" class="date-histogram"></div>
+                        <div id="date-slider-container" class="date-slider-container">
+                            <div id="slider-range-fill" class="slider-range-fill"></div>
+                            <input type="range" id="date-slider-min" class="date-slider" min="0" max="100" value="0">
+                            <input type="range" id="date-slider-max" class="date-slider" min="0" max="100" value="100">
+                        </div>
+                        <div class="date-range-labels">
+                            <span id="date-range-start" class="date-label">All</span>
+                            <span id="date-range-end" class="date-label">All</span>
+                        </div>
+                    </div>
+                    <button id="clear-dates" class="clear-dates-btn" style="margin-top: 8px;">Clear Range</button>
+                </div>
             </div>
         </div>
     </div>
@@ -654,6 +876,8 @@
                 house: document.getElementById('filter-house').checked,
                 land: document.getElementById('filter-land').checked,
                 unknown: document.getElementById('filter-unknown').checked,
+                dateMinIndex: minDateIndex,
+                dateMaxIndex: maxDateIndex,
                 timestamp: Date.now()
             };
             localStorage.setItem('laendlefinderFilters', JSON.stringify(filterSettings));
@@ -714,6 +938,10 @@
         let currentHighlightedProperty = null;
         let filteredProperties = [];
         let showOnlyVisible = false;
+        let dateHistogramData = [];
+        let sortedDates = [];
+        let minDateIndex = 0;
+        let maxDateIndex = 0;
 
         // Function to parse CSV data
         async function loadCSVData() {
@@ -726,6 +954,7 @@
                     complete: function(results) {
                         console.log(results.data);
                         allProperties = results.data.filter(prop => prop.url); // Filter out empty rows
+                        buildDateHistogram(); // Build histogram after data is loaded
                         updateFilterCounts();
                         applyFilters(); // Use applyFilters instead of direct calls
                         const loadingElement = document.getElementById('loading');
@@ -1128,6 +1357,198 @@
             `;
         }
 
+        // Function to build date histogram
+        function buildDateHistogram() {
+            // Collect all valid dates from properties, filtering out invalid dates
+            const dates = [];
+            const today = new Date();
+            const earliestValidDate = new Date('2000-01-01'); // Reasonable earliest date
+            
+            allProperties.forEach(property => {
+                if (property.date && property.date.trim() !== '') {
+                    const date = new Date(property.date);
+                    // Filter out invalid dates and dates that are clearly wrong
+                    if (!isNaN(date.getTime()) && 
+                        date >= earliestValidDate && 
+                        date <= today) {
+                        dates.push(date);
+                    }
+                }
+            });
+            
+            if (dates.length === 0) {
+                // No valid dates available, hide the date filter
+                const filterGroup = document.querySelector('.filter-group');
+                if (filterGroup && filterGroup.querySelector('#date-histogram')) {
+                    filterGroup.style.display = 'none';
+                }
+                return;
+            }
+            
+            // Sort dates and create sorted array
+            sortedDates = dates.sort((a, b) => a - b);
+            const minDate = sortedDates[0];
+            let maxDate = sortedDates[sortedDates.length - 1];
+            
+            // Ensure today is always the maximum date (rightmost)
+            if (maxDate < today) {
+                maxDate = today;
+            }
+            
+            // Create monthly buckets for histogram, ensuring we cover from minDate to today
+            const monthBuckets = {};
+            
+            // Add all property dates to buckets
+            sortedDates.forEach(date => {
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                monthBuckets[monthKey] = (monthBuckets[monthKey] || 0) + 1;
+            });
+            
+            // Create continuous range from min date to today
+            const startDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+            const endDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            dateHistogramData = [];
+            const currentDate = new Date(startDate);
+            
+            while (currentDate <= endDate) {
+                const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+                dateHistogramData.push({
+                    month: monthKey,
+                    count: monthBuckets[monthKey] || 0, // 0 if no properties in this month
+                    date: new Date(currentDate)
+                });
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+            
+            // Initialize slider to full range
+            maxDateIndex = dateHistogramData.length - 1;
+            
+            // Build the histogram visualization
+            renderDateHistogram();
+            updateDateLabels();
+            updateSliderRangeFill();
+            
+            // Update slider ranges after histogram is built
+            if (window.updateSliderRanges) {
+                window.updateSliderRanges();
+            }
+        }
+        
+        // Function to render the histogram bars
+        function renderDateHistogram() {
+            const histogramContainer = document.getElementById('date-histogram');
+            histogramContainer.innerHTML = '';
+            
+            if (dateHistogramData.length === 0) return;
+            
+            const maxCount = Math.max(...dateHistogramData.map(d => d.count));
+            const containerWidth = histogramContainer.clientWidth || 280;
+            const barWidth = Math.max((containerWidth / dateHistogramData.length) - 1, 1);
+            
+            dateHistogramData.forEach((data, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'histogram-bar';
+                bar.style.left = `${(index * (containerWidth / dateHistogramData.length))}px`;
+                bar.style.width = `${barWidth}px`;
+                
+                // Ensure bars with no data are still visible but very small
+                const height = data.count === 0 ? 1 : Math.max((data.count / maxCount) * 50, 2);
+                bar.style.height = `${height}px`;
+                
+                // Set data attribute for count (used in highlighting)
+                bar.setAttribute('data-count', data.count.toString());
+                
+                // Set tooltip
+                if (data.count === 0) {
+                    bar.title = `${data.month}: No properties`;
+                } else {
+                    bar.title = `${data.month}: ${data.count} ${data.count === 1 ? 'property' : 'properties'}`;
+                }
+                
+                histogramContainer.appendChild(bar);
+            });
+            
+            // Update histogram based on current selection
+            updateHistogramSelection();
+        }
+        
+        // Function to update histogram bar highlighting
+        function updateHistogramSelection() {
+            const bars = document.querySelectorAll('.histogram-bar');
+            
+            // Debug info
+            console.log(`Updating histogram selection: minIndex=${minDateIndex}, maxIndex=${maxDateIndex}, bars=${bars.length}`);
+            
+            bars.forEach((bar, index) => {
+                // Clear any existing classes
+                bar.classList.remove('dimmed', 'empty-month', 'selected');
+                
+                // Determine the appropriate styling
+                const isEmpty = bar.getAttribute('data-count') === '0';
+                const isSelected = index >= minDateIndex && index <= maxDateIndex;
+                
+                if (isSelected) {
+                    if (isEmpty) {
+                        bar.classList.add('empty-month');
+                    } else {
+                        bar.classList.add('selected');
+                    }
+                } else {
+                    bar.classList.add('dimmed');
+                }
+            });
+        }
+        
+        // Function to update the visual range fill between sliders
+        function updateSliderRangeFill() {
+            const rangeFill = document.getElementById('slider-range-fill');
+            if (!rangeFill || dateHistogramData.length === 0) return;
+            
+            const containerWidth = document.getElementById('date-slider-container').offsetWidth || 280;
+            const totalRange = Math.max(1, dateHistogramData.length - 1);
+            
+            const startPercent = (minDateIndex / totalRange) * 100;
+            const endPercent = (maxDateIndex / totalRange) * 100;
+            const widthPercent = endPercent - startPercent;
+            
+            rangeFill.style.left = `${startPercent}%`;
+            rangeFill.style.width = `${widthPercent}%`;
+        }
+        
+        // Function to update date range labels
+        function updateDateLabels() {
+            const startLabel = document.getElementById('date-range-start');
+            const endLabel = document.getElementById('date-range-end');
+            
+            if (dateHistogramData.length === 0) {
+                startLabel.textContent = 'No dates';
+                endLabel.textContent = 'No dates';
+                return;
+            }
+            
+            if (minDateIndex === 0 && maxDateIndex === dateHistogramData.length - 1) {
+                startLabel.textContent = 'All';
+                endLabel.textContent = 'All';
+            } else {
+                // Ensure indices are within bounds
+                const safeMinIndex = Math.max(0, Math.min(minDateIndex, dateHistogramData.length - 1));
+                const safeMaxIndex = Math.max(0, Math.min(maxDateIndex, dateHistogramData.length - 1));
+                
+                const startDate = dateHistogramData[safeMinIndex].date;
+                const endDate = dateHistogramData[safeMaxIndex].date;
+                
+                try {
+                    startLabel.textContent = startDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                    endLabel.textContent = endDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                } catch (error) {
+                    console.warn('Date formatting error:', error);
+                    startLabel.textContent = 'Invalid';
+                    endLabel.textContent = 'Invalid';
+                }
+            }
+        }
+
         // Function to apply filters
         function applyFilters() {
             const showAvailable = document.getElementById('filter-available').checked;
@@ -1137,6 +1558,19 @@
             const showHouse = document.getElementById('filter-house').checked;
             const showLand = document.getElementById('filter-land').checked;
             const showUnknown = document.getElementById('filter-unknown').checked;
+            
+            // Get date filter range from histogram slider
+            const hasDateFilter = minDateIndex > 0 || maxDateIndex < dateHistogramData.length - 1;
+            let startDate = null;
+            let endDate = null;
+            
+            if (hasDateFilter && dateHistogramData.length > 0) {
+                startDate = dateHistogramData[minDateIndex].date;
+                endDate = new Date(dateHistogramData[maxDateIndex].date);
+                endDate.setMonth(endDate.getMonth() + 1); // End of selected month
+                endDate.setDate(0); // Last day of previous month (i.e., last day of selected month)
+                endDate.setHours(23, 59, 59, 999); // End of day
+            }
             
             // Save filter settings to local storage
             saveFilterSettings();
@@ -1152,6 +1586,19 @@
                 if (property.property_type === 'house' && !showHouse) return false;
                 if (property.property_type === 'land' && !showLand) return false;
                 if (property.property_type === 'unknown' && !showUnknown) return false;
+                
+                // Filter by date range from histogram slider
+                if (hasDateFilter) {
+                    if (property.date) {
+                        const propertyDate = new Date(property.date);
+                        
+                        if (startDate && propertyDate < startDate) return false;
+                        if (endDate && propertyDate > endDate) return false;
+                    } else {
+                        // If property has no date and date filter is active, exclude it
+                        return false;
+                    }
+                }
                 
                 return true;
             });
@@ -1227,6 +1674,16 @@
             document.getElementById('filter-house').checked = true;
             document.getElementById('filter-land').checked = true;
             document.getElementById('filter-unknown').checked = true;
+            
+            // Reset date histogram range
+            minDateIndex = 0;
+            maxDateIndex = Math.max(0, dateHistogramData.length - 1);
+            if (window.updateSliderRanges) {
+                window.updateSliderRanges();
+            }
+            updateHistogramSelection();
+            updateDateLabels();
+            updateSliderRangeFill();
             
             applyFilters(); // Refresh the display
             closeSidebar(); // Close the panel after reset
@@ -1470,6 +1927,13 @@
                 document.getElementById('filter-house').checked = storedSettings.house;
                 document.getElementById('filter-land').checked = storedSettings.land;
                 document.getElementById('filter-unknown').checked = storedSettings.unknown;
+                
+                // Restore date histogram range if it exists
+                if (storedSettings.dateMinIndex !== undefined && storedSettings.dateMaxIndex !== undefined) {
+                    minDateIndex = storedSettings.dateMinIndex;
+                    maxDateIndex = storedSettings.dateMaxIndex;
+                    // Update will happen when histogram is built
+                }
             }
         }
 
@@ -1486,7 +1950,90 @@
                     checkbox.addEventListener('change', applyFilters);
                 }
             });
+            
+            // Add event listeners for date histogram slider
+            const minSlider = document.getElementById('date-slider-min');
+            const maxSlider = document.getElementById('date-slider-max');
+            const clearDatesBtn = document.getElementById('clear-dates');
+            
+            if (minSlider && maxSlider) {
+                // Update slider ranges when histogram is built
+                function updateSliderRanges() {
+                    const maxRange = Math.max(0, dateHistogramData.length - 1);
+                    minSlider.max = maxRange;
+                    maxSlider.max = maxRange;
+                    minSlider.value = minDateIndex;
+                    maxSlider.value = maxDateIndex;
+                }
+                
+                // Handle slider changes
+                function handleSliderChange() {
+                    const minVal = parseInt(minSlider.value);
+                    const maxVal = parseInt(maxSlider.value);
+                    const maxRange = Math.max(0, dateHistogramData.length - 1);
+                    
+                    // Ensure values are within bounds
+                    const boundedMinVal = Math.max(0, Math.min(minVal, maxRange));
+                    const boundedMaxVal = Math.max(0, Math.min(maxVal, maxRange));
+                    
+                    // Ensure min doesn't exceed max (allow them to be equal)
+                    if (boundedMinVal > boundedMaxVal) {
+                        if (this === minSlider) {
+                            maxSlider.value = boundedMinVal;
+                            minDateIndex = boundedMinVal;
+                            maxDateIndex = boundedMinVal;
+                        } else {
+                            minSlider.value = boundedMaxVal;
+                            minDateIndex = boundedMaxVal;
+                            maxDateIndex = boundedMaxVal;
+                        }
+                    } else {
+                        minDateIndex = boundedMinVal;
+                        maxDateIndex = boundedMaxVal;
+                    }
+                    
+                    // Update sliders to reflect any corrections
+                    minSlider.value = minDateIndex;
+                    maxSlider.value = maxDateIndex;
+                    
+                    updateHistogramSelection();
+                    updateDateLabels();
+                    updateSliderRangeFill();
+                    applyFilters();
+                }
+                
+                minSlider.addEventListener('input', handleSliderChange.bind(minSlider));
+                maxSlider.addEventListener('input', handleSliderChange.bind(maxSlider));
+                
+                // Also add change events for better compatibility
+                minSlider.addEventListener('change', handleSliderChange.bind(minSlider));
+                maxSlider.addEventListener('change', handleSliderChange.bind(maxSlider));
+                
+                // Initial setup will be called after histogram is built
+                window.updateSliderRanges = updateSliderRanges;
+            }
+            
+            if (clearDatesBtn) {
+                clearDatesBtn.addEventListener('click', function() {
+                    minDateIndex = 0;
+                    maxDateIndex = Math.max(0, dateHistogramData.length - 1);
+                    if (window.updateSliderRanges) {
+                        window.updateSliderRanges();
+                    }
+                    updateHistogramSelection();
+                    updateDateLabels();
+                    updateSliderRangeFill();
+                    applyFilters();
+                });
+            }
         }
+
+        // Handle window resize to redraw histogram
+        window.addEventListener('resize', function() {
+            if (dateHistogramData.length > 0) {
+                setTimeout(renderDateHistogram, 100); // Delay to allow layout to settle
+            }
+        });
 
         // Load the CSV data when the page loads
         document.addEventListener('DOMContentLoaded', function() {
