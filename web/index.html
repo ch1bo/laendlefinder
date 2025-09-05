@@ -223,7 +223,7 @@
             margin: 0;
         }
         .property-price {
-            color: #2c8a2c;
+            color: #000;
             font-weight: bold;
             font-size: 1.1em;
             margin-bottom: 5px;
@@ -251,7 +251,7 @@
             margin-bottom: 5px;
         }
         .info-price {
-            color: #2c8a2c;
+            color: #000;
             font-weight: bold;
             margin-bottom: 5px;
         }
@@ -432,11 +432,13 @@
         .filter-group input[type="checkbox"]:checked::after {
             content: '✓';
             position: absolute;
-            top: -2px;
-            left: 1px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             color: white;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
+            line-height: 1;
         }
         .filter-group input[type="checkbox"]:hover {
             border-color: #007bff;
@@ -484,7 +486,7 @@
         .slider-range-fill {
             position: absolute;
             height: 4px;
-            background: linear-gradient(90deg, #28a745 0%, #007bff 100%);
+            background: #007bff;
             border-radius: 2px;
             top: 50%;
             transform: translateY(-50%);
@@ -593,19 +595,19 @@
         
         /* Differentiate the handles visually */
         #date-slider-min::-webkit-slider-thumb {
-            background: #28a745; /* Green for min */
+            background: #007bff; /* Blue for min */
         }
         
         #date-slider-min::-webkit-slider-thumb:hover {
-            background: #1e7e34;
+            background: #0056b3;
         }
         
         #date-slider-min::-moz-range-thumb {
-            background: #28a745;
+            background: #007bff;
         }
         
         #date-slider-min::-moz-range-thumb:hover {
-            background: #1e7e34;
+            background: #0056b3;
         }
         
         /* Blue stays for max handle */
@@ -695,6 +697,17 @@
             font-size: 0.75em;
             margin-left: 10px;
         }
+        
+        /* Marker clustering styles */
+        .cluster-marker {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        
+        .cluster-popup {
+            max-width: 250px;
+        }
         .lean-popup {
             background-color: white;
             padding: 12px 14px;
@@ -721,7 +734,7 @@
         }
         .lean-popup .popup-price {
             font-weight: bold;
-            color: #2c8a2c;
+            color: #000;
             margin-bottom: 2px;
         }
         .lean-popup .popup-location {
@@ -1037,134 +1050,263 @@
             }
         }
 
+        // Function to calculate distance between two points in pixels
+        function getPixelDistance(latlng1, latlng2) {
+            const point1 = map.latLngToContainerPoint(latlng1);
+            const point2 = map.latLngToContainerPoint(latlng2);
+            const dx = point1.x - point2.x;
+            const dy = point1.y - point2.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Function to cluster nearby markers of the same type
+        function clusterProperties(properties) {
+            const zoom = map.getZoom();
+            // Minimum distance in pixels before clustering - based on marker visual size
+            // At radius 10, diameter is 20px, so cluster when they would visually overlap/touch
+            const markerDiameter = 20; // radius 10 * 2
+            const buffer = 2; // Small buffer to prevent tight clustering
+            const minDistance = markerDiameter + buffer;
+            
+            const clusters = [];
+            const processed = new Set();
+            
+            properties.forEach((property, index) => {
+                if (processed.has(index) || !property.coordinates) return;
+                
+                const coords = property.coordinates.split(',').map(coord => parseFloat(coord.trim()));
+                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) return;
+                
+                const propertyLatLng = L.latLng(coords[0], coords[1]);
+                const cluster = {
+                    properties: [property],
+                    latLng: propertyLatLng,
+                    type: property.listing_type
+                };
+                
+                // Find nearby properties of the same type to cluster
+                properties.forEach((otherProperty, otherIndex) => {
+                    if (processed.has(otherIndex) || otherIndex <= index || !otherProperty.coordinates) return;
+                    if (otherProperty.listing_type !== property.listing_type) return;
+                    
+                    const otherCoords = otherProperty.coordinates.split(',').map(coord => parseFloat(coord.trim()));
+                    if (otherCoords.length !== 2 || isNaN(otherCoords[0]) || isNaN(otherCoords[1])) return;
+                    
+                    const otherLatLng = L.latLng(otherCoords[0], otherCoords[1]);
+                    const distance = getPixelDistance(propertyLatLng, otherLatLng);
+                    
+                    if (distance < minDistance) {
+                        cluster.properties.push(otherProperty);
+                        processed.add(otherIndex);
+                    }
+                });
+                
+                processed.add(index);
+                clusters.push(cluster);
+            });
+            
+            return clusters;
+        }
+
         // Function to display properties on the map
         function displayProperties(properties) {
             // Clear existing markers
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
             
-            properties.forEach((property, index) => {
-                // Skip properties without coordinates
-                if (!property.coordinates) return;
-                
+            // Cluster properties based on zoom level and distance
+            const clusters = clusterProperties(properties);
+            
+            clusters.forEach((cluster, index) => {
                 try {
-                    // Parse coordinates (expected format: "lat,lng")
-                    const coords = property.coordinates.split(',').map(coord => parseFloat(coord.trim()));
-                    
-                    if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
-                        console.warn('Invalid coordinates for property:', property);
-                        return;
-                    }
-                    
-                    // Choose marker color based on listing type
+                    // Choose marker color based on cluster type
                     let markerColor = '#28a745'; // default green for available
-                    if (property.listing_type === 'sold') {
+                    if (cluster.type === 'sold') {
                         markerColor = '#ff0000'; // red for sold
-                    } else if (property.listing_type === 'unavailable') {
+                    } else if (cluster.type === 'unavailable') {
                         markerColor = '#6c757d'; // gray for unavailable
                     }
                     
-                    // Create lightweight CircleMarker (hardware accelerated)
-                    const marker = L.circleMarker([coords[0], coords[1]], {
-                        radius: 8,
-                        fillColor: markerColor,
-                        color: 'white',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).addTo(map);
+                    const count = cluster.properties.length;
+                    let marker;
                     
-                    // Store property reference with marker
-                    marker.propertyData = property;
+                    const radius = 10;
                     
-                    // Add click handler for marker highlighting (same behavior for all devices)
-                    marker.on('click', function() {
-                        highlightProperty(property);
-                        highlightMarker(property);
-                    });
+                    if (count === 1) {
+                        // Single property - use circle marker
+                        marker = L.circleMarker(cluster.latLng, {
+                            radius: radius,
+                            fillColor: markerColor,
+                            color: 'white',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(map);
+                        
+                        marker.propertyData = cluster.properties[0];
+                    } else {
+                        // Cluster marker - use single marker with circle + text
+                        marker = L.marker(cluster.latLng, {
+                            icon: L.divIcon({
+                                html: `
+                                    <div style="
+                                        width: ${radius * 2}px; 
+                                        height: ${radius * 2}px; 
+                                        background-color: ${markerColor}; 
+                                        border: 2px solid white; 
+                                        border-radius: 50%; 
+                                        display: flex; 
+                                        align-items: center; 
+                                        justify-content: center;
+                                        opacity: 0.8;
+                                    ">
+                                        <span style="
+                                            color: white; 
+                                            font-weight: bold; 
+                                            font-size: 10px; 
+                                            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+                                        ">${count}</span>
+                                    </div>
+                                `,
+                                className: 'cluster-marker',
+                                iconSize: [radius * 2, radius * 2],
+                                iconAnchor: [radius, radius]
+                            })
+                        }).addTo(map);
+                        
+                        marker.clusterData = cluster.properties;
+                        marker.isCluster = true;
+                    }
                     
-                    // Add interactive popup
-                    const leanPopupContent = createLeanPopupContent(property);
-                    marker.bindTooltip(leanPopupContent, {
-                        permanent: false,
-                        direction: 'top',
-                        offset: [0, -10],
-                        className: 'lean-popup',
-                        interactive: true
-                    });
-                    
-                    // Add click event to tooltip when it opens
-                    marker.on('tooltipopen', function(e) {
-                        const tooltipEl = e.tooltip.getElement();
-                        if (tooltipEl) {
-                            tooltipEl.style.cursor = 'pointer';
-                            
-                            // Add multiple event listeners for better mobile compatibility
-                            let touchStartTime = 0;
-                            let touchStartPos = { x: 0, y: 0 };
-                            
-                            const handleTouchStart = function(event) {
-                                touchStartTime = Date.now();
-                                const touch = event.touches[0];
-                                touchStartPos = { x: touch.clientX, y: touch.clientY };
-                            };
-                            
-                            const handleTouchEnd = function(event) {
-                                const touchDuration = Date.now() - touchStartTime;
-                                const touch = event.changedTouches[0];
-                                const touchEndPos = { x: touch.clientX, y: touch.clientY };
-                                const distance = Math.sqrt(
-                                    Math.pow(touchEndPos.x - touchStartPos.x, 2) + 
-                                    Math.pow(touchEndPos.y - touchStartPos.y, 2)
-                                );
+                    // Add appropriate click handler
+                    if (marker.isCluster) {
+                        // Cluster marker - show list of properties or zoom in
+                        marker.on('click', function() {
+                            if (map.getZoom() < 18) {
+                                // Zoom in to separate the cluster
+                                map.setView(cluster.latLng, Math.min(map.getZoom() + 2, 18));
+                            } else {
+                                // At max zoom, highlight the first property in the cluster
+                                highlightProperty(cluster.properties[0]);
+                                highlightMarker(cluster.properties[0]);
+                            }
+                        });
+                        
+                        // Add clean cluster popup with property list
+                        const clusterPopupContent = `
+                            <div class="cluster-popup">
+                                ${cluster.properties.slice(0, 5).map(prop => 
+                                    `<div style="padding: 3px 0; border-bottom: 1px solid #eee; line-height: 1.2;">
+                                        <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">${prop.name || 'Unknown Property'}</strong>
+                                        <small style="color: #000; font-weight: bold; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;">${formatPrice(prop.price)}</small>
+                                    </div>`
+                                ).join('')}
+                                ${cluster.properties.length > 5 ? 
+                                    `<div style="padding: 6px 0; font-style: italic; color: #888; text-align: center;">
+                                        ...and ${cluster.properties.length - 5} more
+                                    </div>` : ''
+                                }
+                            </div>
+                        `;
+                        marker.bindTooltip(clusterPopupContent, {
+                            permanent: false,
+                            direction: 'top',
+                            offset: [0, -10],
+                            className: 'lean-popup',
+                            interactive: true
+                        });
+                    } else {
+                        // Single property marker - existing behavior
+                        marker.on('click', function() {
+                            highlightProperty(cluster.properties[0]);
+                            highlightMarker(cluster.properties[0]);
+                        });
+                        
+                        // Add interactive popup for single property
+                        const leanPopupContent = createLeanPopupContent(cluster.properties[0]);
+                        marker.bindTooltip(leanPopupContent, {
+                            permanent: false,
+                            direction: 'top',
+                            offset: [0, -10],
+                            className: 'lean-popup',
+                            interactive: true
+                        });
+                        
+                        // Add click event to tooltip when it opens
+                        marker.on('tooltipopen', function(e) {
+                            const tooltipEl = e.tooltip.getElement();
+                            if (tooltipEl) {
+                                tooltipEl.style.cursor = 'pointer';
                                 
-                                // Only treat as tap if it's quick and didn't move much
-                                if (touchDuration < 300 && distance < 10) {
-                                    event.preventDefault();
+                                // Add multiple event listeners for better mobile compatibility
+                                let touchStartTime = 0;
+                                let touchStartPos = { x: 0, y: 0 };
+                                
+                                const property = cluster.properties[0]; // Use first property for single markers
+                                
+                                const handleTouchStart = function(event) {
+                                    touchStartTime = Date.now();
+                                    const touch = event.touches[0];
+                                    touchStartPos = { x: touch.clientX, y: touch.clientY };
+                                };
+                                
+                                const handleTouchEnd = function(event) {
+                                    const touchDuration = Date.now() - touchStartTime;
+                                    const touch = event.changedTouches[0];
+                                    const touchEndPos = { x: touch.clientX, y: touch.clientY };
+                                    const distance = Math.sqrt(
+                                        Math.pow(touchEndPos.x - touchStartPos.x, 2) + 
+                                        Math.pow(touchEndPos.y - touchStartPos.y, 2)
+                                    );
+                                    
+                                    // Only treat as tap if it's quick and didn't move much
+                                    if (touchDuration < 300 && distance < 10) {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        openListPanelWithProperty(property);
+                                    }
+                                };
+                                
+                                const handleClick = function(event) {
                                     event.stopPropagation();
                                     openListPanelWithProperty(property);
+                                };
+                                
+                                tooltipEl.addEventListener('click', handleClick);
+                                tooltipEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+                                tooltipEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+                                
+                                // Store the handlers for cleanup
+                                tooltipEl._clickHandler = handleClick;
+                                tooltipEl._touchStartHandler = handleTouchStart;
+                                tooltipEl._touchEndHandler = handleTouchEnd;
+                            }
+                        });
+                        
+                        // Clean up event listeners when tooltip closes
+                        marker.on('tooltipclose', function(e) {
+                            const tooltipEl = e.tooltip.getElement();
+                            if (tooltipEl) {
+                                if (tooltipEl._clickHandler) {
+                                    tooltipEl.removeEventListener('click', tooltipEl._clickHandler);
+                                    delete tooltipEl._clickHandler;
                                 }
-                            };
-                            
-                            const handleClick = function(event) {
-                                event.stopPropagation();
-                                openListPanelWithProperty(property);
-                            };
-                            
-                            tooltipEl.addEventListener('click', handleClick);
-                            tooltipEl.addEventListener('touchstart', handleTouchStart, { passive: true });
-                            tooltipEl.addEventListener('touchend', handleTouchEnd, { passive: false });
-                            
-                            // Store the handlers for cleanup
-                            tooltipEl._clickHandler = handleClick;
-                            tooltipEl._touchStartHandler = handleTouchStart;
-                            tooltipEl._touchEndHandler = handleTouchEnd;
-                        }
-                    });
-                    
-                    // Clean up event listeners when tooltip closes
-                    marker.on('tooltipclose', function(e) {
-                        const tooltipEl = e.tooltip.getElement();
-                        if (tooltipEl) {
-                            if (tooltipEl._clickHandler) {
-                                tooltipEl.removeEventListener('click', tooltipEl._clickHandler);
-                                delete tooltipEl._clickHandler;
+                                if (tooltipEl._touchStartHandler) {
+                                    tooltipEl.removeEventListener('touchstart', tooltipEl._touchStartHandler);
+                                    delete tooltipEl._touchStartHandler;
+                                }
+                                if (tooltipEl._touchEndHandler) {
+                                    tooltipEl.removeEventListener('touchend', tooltipEl._touchEndHandler);
+                                    delete tooltipEl._touchEndHandler;
+                                }
                             }
-                            if (tooltipEl._touchStartHandler) {
-                                tooltipEl.removeEventListener('touchstart', tooltipEl._touchStartHandler);
-                                delete tooltipEl._touchStartHandler;
-                            }
-                            if (tooltipEl._touchEndHandler) {
-                                tooltipEl.removeEventListener('touchend', tooltipEl._touchEndHandler);
-                                delete tooltipEl._touchEndHandler;
-                            }
-                        }
-                    });
+                        });
+                    }
                     
                     // Store marker for filtering
                     markers.push(marker);
                 } catch (error) {
-                    console.warn('Error processing property:', property, error);
+                    console.warn('Error processing cluster:', cluster, error);
                 }
             });
         }
@@ -1384,7 +1526,7 @@
             // Create three-column layout
             return `
                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
-                    <span style="color: #2c8a2c; font-weight: bold; font-size: 1em; flex: 1; text-align: left;">${formattedPrice}</span>
+                    <span style="color: #000; font-weight: bold; font-size: 1em; flex: 1; text-align: left;">${formattedPrice}</span>
                     ${livingPricePerSqm ? `<span style="color: #666; font-weight: bold; font-size: 1em; flex: 1; text-align: center;">${livingPricePerSqm}</span>` : '<span style="flex: 1;"></span>'}
                     ${groundPricePerSqm ? `<span style="color: #666; font-weight: bold; font-size: 1em; flex: 1; text-align: right;">${groundPricePerSqm}</span>` : '<span style="flex: 1;"></span>'}
                 </div>
