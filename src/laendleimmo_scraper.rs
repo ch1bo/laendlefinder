@@ -824,7 +824,7 @@ fn create_unavailable_property(original_url: &str, body: &str, document: &Html, 
     
     let now = chrono::Utc::now().naive_utc().date();
     
-    // If we have existing property data, preserve it and only update status and last_seen
+    // If we have existing property data, preserve it and only update status (preserve last_seen)
     if let Some(existing) = existing_property {
         debug_println!("Preserving existing property data, only updating to unavailable status");
         return Ok(Property {
@@ -840,7 +840,7 @@ fn create_unavailable_property(original_url: &str, body: &str, document: &Html, 
             size_living: existing.size_living.clone(),
             size_ground: existing.size_ground.clone(),
             first_seen: existing.first_seen,
-            last_seen: Some(now),
+            last_seen: existing.last_seen, // Preserve existing last_seen, don't update
         });
     }
     

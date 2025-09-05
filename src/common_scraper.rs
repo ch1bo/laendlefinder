@@ -353,8 +353,8 @@ pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property>
                         size_ground: existing.size_ground.clone().or(property.size_ground),
                         // Keep the earliest first_seen date
                         first_seen: existing.first_seen.or(property.first_seen),
-                        // Use the latest last_seen date
-                        last_seen: property.last_seen.or(existing.last_seen),
+                        // Preserve existing last_seen since property became unavailable
+                        last_seen: existing.last_seen.or(property.last_seen),
                     }
                 } else {
                     // Normal property update - use new data but preserve tracking dates
