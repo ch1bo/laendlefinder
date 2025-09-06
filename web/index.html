@@ -793,6 +793,28 @@
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(0,123,255,0.3);
         }
+        .favorite-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            color: #ddd;
+            transition: all 0.2s ease;
+            padding: 4px;
+            margin-left: 8px;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .favorite-button:hover {
+            color: #ffc107;
+            transform: scale(1.1);
+        }
+        .favorite-button.favorited {
+            color: #ffc107;
+        }
+        .favorite-button.favorited:hover {
+            color: #e0a800;
+        }
     </style>
 </head>
 <body>
@@ -809,7 +831,10 @@
         </div>
         <div id="count-info" class="count-info">
             <span id="property-count" class="property-count">Loading...</span>
-            <button class="reset-button" onclick="resetView()">Reset</button>
+            <div style="display: flex; gap: 8px;">
+                <button class="reset-button" onclick="showFavorites()">Favorites</button>
+                <button class="reset-button" onclick="resetView()">Reset</button>
+            </div>
         </div>
         <div id="property-panel" class="panel active">
             <div id="property-list">
@@ -886,6 +911,48 @@
             crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script>
+        // Local storage functions for favorites
+        function saveFavorites() {
+            const favoritesArray = Array.from(favorites);
+            const favoritesData = {
+                favorites: favoritesArray,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('laendlefinderFavorites', JSON.stringify(favoritesData));
+        }
+
+        function loadFavorites() {
+            try {
+                const stored = localStorage.getItem('laendlefinderFavorites');
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    // Load favorites regardless of age (they should persist)
+                    if (data.favorites && Array.isArray(data.favorites)) {
+                        favorites = new Set(data.favorites);
+                    }
+                }
+            } catch (error) {
+                console.warn('Error loading favorites:', error);
+                favorites = new Set();
+            }
+        }
+
+        function toggleFavorite(propertyUrl) {
+            if (favorites.has(propertyUrl)) {
+                favorites.delete(propertyUrl);
+            } else {
+                favorites.add(propertyUrl);
+            }
+            saveFavorites();
+            updateFilterCounts();
+            // Refresh the display to update star states
+            displayPropertyList(displayedProperties);
+        }
+
+        function isFavorite(propertyUrl) {
+            return favorites.has(propertyUrl);
+        }
+
         // Local storage functions for map position
         function saveMapPosition(lat, lng, zoom) {
             const mapPosition = {
@@ -910,6 +977,7 @@
                 dateMinIndex: minDateIndex,
                 dateMaxIndex: maxDateIndex,
                 showOnlyVisible: showOnlyVisible,
+                showingFavoritesOnly: showingFavoritesOnly,
                 timestamp: Date.now()
             };
             localStorage.setItem('laendlefinderFilters', JSON.stringify(filterSettings));
@@ -1009,6 +1077,8 @@
         let sortedDates = [];
         let minDateIndex = 0;
         let maxDateIndex = 0;
+        let favorites = new Set(); // Set to store favorite property URLs
+        let showingFavoritesOnly = false; // Track if we're showing only favorites
 
         // Function to parse CSV data
         async function loadCSVData() {
@@ -1133,7 +1203,7 @@
                     const radius = 10;
                     
                     if (count === 1) {
-                        // Single property - use circle marker
+                        // Single property - use circle marker for all properties
                         marker = L.circleMarker(cluster.latLng, {
                             radius: radius,
                             fillColor: markerColor,
@@ -1421,7 +1491,8 @@
             // Update the count in the sidebar header
             const propertyCountElement = document.getElementById('property-count');
             if (propertyCountElement) {
-                propertyCountElement.textContent = `${properties.length} out of ${allProperties.length} properties`;
+                const favoritesText = showingFavoritesOnly ? ' (favorites only)' : '';
+                propertyCountElement.textContent = `${properties.length} out of ${allProperties.length} properties${favoritesText}`;
             }
             
             // Handle empty results
@@ -1447,9 +1518,14 @@
                 propertyDiv.innerHTML = `
                     <div class="property-header">
                         <div class="property-title">${property.name || `${property.location} - ${formatPropertyType(property.property_type)}`}</div>
-                        <a href="${property.url}" target="_blank" class="details-button" onclick="event.stopPropagation();">
-                            Details
-                        </a>
+                        <div style="display: flex; align-items: center;">
+                            <button class="favorite-button ${isFavorite(property.url) ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleFavorite('${property.url}');" title="${isFavorite(property.url) ? 'Remove from favorites' : 'Add to favorites'}">
+                                ★
+                            </button>
+                            <a href="${property.url}" target="_blank" class="details-button" onclick="event.stopPropagation();">
+                                Details
+                            </a>
+                        </div>
                     </div>
                     <div class="property-location">${property.address || property.location}</div>
                     <div class="property-price">${formatPriceWithSqmPrice(property)}</div>
@@ -1871,6 +1947,9 @@
             
             // First, apply non-date filters to get base set
             let baseFilteredProperties = allProperties.filter(property => {
+                // If showing favorites only, only include favorites
+                if (showingFavoritesOnly && !isFavorite(property.url)) return false;
+                
                 // Filter by listing type
                 if (property.listing_type === 'available' && !showAvailable) return false;
                 if (property.listing_type === 'sold' && !showSold) return false;
@@ -1985,8 +2064,19 @@
             }
         }
         
+        // Function to show only favorite properties
+        function showFavorites() {
+            showingFavoritesOnly = true;
+            showOnlyVisible = false;
+            clearHighlights();
+            
+            // Keep current map position but apply favorites filter
+            applyFilters();
+        }
+
         // Function to reset view and show all properties
         function resetView() {
+            showingFavoritesOnly = false;
             showOnlyVisible = false;
             clearHighlights();
             map.setView([47.2499, 9.9809], 10); // Reset to initial Vorarlberg view
@@ -2275,6 +2365,11 @@
                 if (storedSettings.showOnlyVisible !== undefined) {
                     showOnlyVisible = storedSettings.showOnlyVisible;
                 }
+                
+                // Restore showingFavoritesOnly state
+                if (storedSettings.showingFavoritesOnly !== undefined) {
+                    showingFavoritesOnly = storedSettings.showingFavoritesOnly;
+                }
             }
         }
 
@@ -2378,6 +2473,7 @@
 
         // Load the CSV data when the page loads
         document.addEventListener('DOMContentLoaded', function() {
+            loadFavorites(); // Load favorites from local storage
             restoreFilterSettings(); // Restore saved filter settings first
             restorePanelState(); // Restore saved panel state
             loadCSVData();
