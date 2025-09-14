@@ -166,11 +166,11 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
             return Ok(());
         }
         
-        // Sort by last_seen date (oldest first), then by first_seen for properties without last_seen
+        // Sort by main property date (oldest first), then by first_seen for properties without date
         relevant_properties.sort_by(|a, b| {
-            match (a.last_seen, b.last_seen) {
+            match (a.date, b.date) {
                 (Some(a_date), Some(b_date)) => a_date.cmp(&b_date), // oldest first
-                (None, Some(_)) => std::cmp::Ordering::Less, // properties without last_seen come first
+                (None, Some(_)) => std::cmp::Ordering::Less, // properties without date come first
                 (Some(_), None) => std::cmp::Ordering::Greater,
                 (None, None) => a.first_seen.cmp(&b.first_seen), // fallback to first_seen
             }
