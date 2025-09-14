@@ -317,12 +317,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
                 let mut current_properties = all_properties.clone();
                 current_properties.extend(newly_scraped.clone());
                 
-                // If in refresh mode, remove old versions of successfully scraped URLs
-                if options.refresh_days.is_some() {
-                    let scraped_urls: HashSet<String> = newly_scraped.iter().map(|p| p.url.clone()).collect();
-                    current_properties.retain(|p| !scraped_urls.contains(&p.url) || newly_scraped.iter().any(|np| np.url == p.url));
-                }
-                
+                // Use deduplication logic to properly handle unavailable transitions
                 let deduplicated = deduplicate_properties_by_url(current_properties);
                 utils::save_properties_to_csv(&deduplicated, &options.output_file)?;
             }
@@ -342,12 +337,6 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     // Calculate final totals for summary
     let mut final_properties = all_properties.clone();
     final_properties.extend(newly_scraped.clone());
-    
-    if options.refresh_days.is_some() {
-        let scraped_urls: HashSet<String> = urls_to_scrape.iter().cloned().collect();
-        final_properties.retain(|p| !scraped_urls.contains(&p.url));
-        final_properties.extend(newly_scraped);
-    }
     
     let deduplicated_properties = deduplicate_properties_by_url(final_properties);
 
