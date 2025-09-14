@@ -152,6 +152,10 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
                 if !x.url.contains(scraper.base_url()) {
                     return false;
                 }
+                // Only refresh available properties - no point in refreshing unavailable or sold properties
+                if x.listing_type != ListingType::Available {
+                    return false;
+                }
                 // Filter by age - include properties without last_seen or with old last_seen
                 match x.last_seen {
                     None => true, // Properties without last_seen should be refreshed
