@@ -73,7 +73,12 @@ pub fn scrape_new_urls_until_no_new_found(mut tui: Option<&mut ScraperTUI>, exis
                 }
             }
             Err(e) => {
-                debug_eprintln!("Error scraping page {}: {}", current_page, e);
+                if e.to_string().contains("Rate limited") {
+                    eprintln!("🚫 {}", e);
+                    eprintln!("💡 Tip: Wait a few minutes before trying again, or use a VPN to change your IP address.");
+                } else {
+                    debug_eprintln!("Error scraping page {}: {}", current_page, e);
+                }
                 break;
             }
         }
@@ -136,7 +141,12 @@ pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTU
                 }
             }
             Err(e) => {
-                debug_eprintln!("Error scraping page {}: {}", page, e);
+                if e.to_string().contains("Rate limited") {
+                    eprintln!("🚫 {}", e);
+                    eprintln!("💡 Tip: Wait a few minutes before trying again, or use a VPN to change your IP address.");
+                } else {
+                    debug_eprintln!("Error scraping page {}: {}", page, e);
+                }
                 break;
             }
         }
@@ -167,14 +177,30 @@ pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
         .send()
         .context("Failed to fetch listing page")?;
 
+    // Check for rate limiting using HTTP status code (more reliable)
+    let status = response.status();
+    if status == 429 || status == 503 || status == 403 {
+        let retry_after = response.headers()
+            .get("retry-after")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok());
+        
+        let retry_msg = if let Some(seconds) = retry_after {
+            format!("Rate limited. Please wait {} seconds before retrying.", seconds)
+        } else {
+            "Rate limited by server. Please wait before retrying.".to_string()
+        };
+        
+        eprintln!("🚫 {}", retry_msg);
+        return Err(anyhow::anyhow!("{}", retry_msg));
+    }
+
     let body = response.text().context("Failed to read response body")?;
     
-    
-    // Check for rate limiting indicators
+    // Fallback: check body content for rate limiting indicators
     if is_rate_limited(&body) {
-        debug_println!("Rate limiting detected on listing page. Body length: {}", body.len());
-        debug_println!("Body preview: {}", &body[..std::cmp::min(500, body.len())]);
-        return Err(anyhow::anyhow!("Rate limiting detected on listing page"));
+        eprintln!("🚫 Rate limiting detected in response content. Please wait before retrying.");
+        return Err(anyhow::anyhow!("Rate limiting detected in response content"));
     }
     
     let document = Html::parse_document(&body);
@@ -219,15 +245,32 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
         .send()
         .context("Failed to fetch property page")?;
 
+    // Check for rate limiting using HTTP status code
+    let status = response.status();
+    if status == 429 || status == 503 || status == 403 {
+        let retry_after = response.headers()
+            .get("retry-after")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok());
+        
+        let retry_msg = if let Some(seconds) = retry_after {
+            format!("Rate limited. Please wait {} seconds before retrying.", seconds)
+        } else {
+            "Rate limited by server. Please wait before retrying.".to_string()
+        };
+        
+        return Err(anyhow::anyhow!("{}", retry_msg));
+    }
+
     // Check for archived/unavailable properties
     let final_url = response.url().to_string();
     debug_println!("Final URL after redirects: {}", final_url);
     
     let body = response.text().context("Failed to read response body")?;
     
-    // Check for rate limiting indicators
+    // Fallback: check body content for rate limiting indicators
     if is_rate_limited(&body) {
-        return Err(anyhow::anyhow!("Rate limiting detected on property page"));
+        return Err(anyhow::anyhow!("Rate limiting detected in response content"));
     }
     
     let document = Html::parse_document(&body);
@@ -852,6 +895,7 @@ fn is_rate_limited(body: &str) -> bool {
     body.contains("challenge-platform") ||
     body.contains("DDoS protection") ||
     body.contains("Error 1015") ||
+    body.contains("error code: 1015") ||
     body.contains("Error 429") ||
     body.contains("Checking your browser") ||
     body.len() < 1000 && (body.contains("Checking") || body.contains("Please wait"))
