@@ -152,13 +152,31 @@ pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTU
 pub fn scrape_listing_page(url: &str) -> Result<Vec<String>> {
     debug_println!("Fetching listing page: {}", url);
 
-    let response = reqwest::blocking::Client::new()
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let response = client
         .get(url)
         .header("User-Agent", get_random_user_agent())
+        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+        .header("Accept-Language", "en-US,en;q=0.5")
+        .header("Connection", "keep-alive")
+        .header("Upgrade-Insecure-Requests", "1")
         .send()
         .context("Failed to fetch listing page")?;
 
     let body = response.text().context("Failed to read response body")?;
+    
+    
+    // Check for rate limiting indicators
+    if is_rate_limited(&body) {
+        debug_println!("Rate limiting detected on listing page. Body length: {}", body.len());
+        debug_println!("Body preview: {}", &body[..std::cmp::min(500, body.len())]);
+        return Err(anyhow::anyhow!("Rate limiting detected on listing page"));
+    }
+    
     let document = Html::parse_document(&body);
 
     // Look for property links in the listing page
@@ -206,6 +224,12 @@ pub fn scrape_property_page(url: &str) -> Result<Property> {
     debug_println!("Final URL after redirects: {}", final_url);
     
     let body = response.text().context("Failed to read response body")?;
+    
+    // Check for rate limiting indicators
+    if is_rate_limited(&body) {
+        return Err(anyhow::anyhow!("Rate limiting detected on property page"));
+    }
+    
     let document = Html::parse_document(&body);
     
     // Detect if property is unavailable (archived)
@@ -817,6 +841,20 @@ fn parse_date_string(date_str: &str) -> Option<NaiveDate> {
     }
 
     None
+}
+
+fn is_rate_limited(body: &str) -> bool {
+    // Check for common rate limiting indicators
+    body.contains("Too Many Requests") ||
+    body.contains("Rate limit exceeded") ||
+    body.contains("Cloudflare") ||
+    body.contains("cf-browser-verification") ||
+    body.contains("challenge-platform") ||
+    body.contains("DDoS protection") ||
+    body.contains("Error 1015") ||
+    body.contains("Error 429") ||
+    body.contains("Checking your browser") ||
+    body.len() < 1000 && (body.contains("Checking") || body.contains("Please wait"))
 }
 
 fn create_unavailable_property(original_url: &str, body: &str, document: &Html, existing_property: Option<&Property>) -> Result<Property> {

@@ -332,7 +332,7 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
         }
 
         // Add a small delay to be respectful to the server
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     // Final cleanup and summary (properties already saved after each scrape)
