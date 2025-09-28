@@ -84,6 +84,11 @@ pub fn scrape_new_urls_until_no_new_found(mut tui: Option<&mut ScraperTUI>, exis
         }
 
         current_page += 1;
+        
+        // Add delay between listing page requests to avoid rate limiting
+        if current_page <= 50 { // Only delay if we're continuing to next page
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+        }
     }
 
     if let Some(tui) = tui.as_mut() {
@@ -149,6 +154,11 @@ pub fn scrape_all_listing_pages(max_pages: usize, mut tui: Option<&mut ScraperTU
                 }
                 break;
             }
+        }
+        
+        // Add delay between listing page requests to avoid rate limiting
+        if page < max_pages {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
         }
     }
 
