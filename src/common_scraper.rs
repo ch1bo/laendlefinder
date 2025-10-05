@@ -101,19 +101,19 @@ pub fn scrape_single_url<T: PlatformScraper>(
                         last_seen: existing.last_seen.or(property.last_seen),
                     }
                 } else {
-                    // Normal property update - use new data but preserve tracking dates
+                    // Normal property update - use new data but preserve existing data when scraper fails
                     Property {
                         url: property.url.clone(),
-                        name: property.name,
-                        price: property.price,
-                        location: property.location,
-                        property_type: property.property_type,
-                        listing_type: property.listing_type,
-                        date: property.date,
-                        coordinates: property.coordinates,
-                        address: property.address,
-                        size_living: property.size_living,
-                        size_ground: property.size_ground,
+                        name: if property.name.is_empty() || property.name == "Unknown Property" || property.name == "Unavailable Property" { existing.name.clone() } else { property.name },
+                        price: if property.price.is_empty() || property.price == "Unknown" || property.price == "Unavailable" { existing.price.clone() } else { property.price },
+                        location: if property.location.is_empty() || property.location == "Unknown" { existing.location.clone() } else { property.location },
+                        property_type: if property.property_type == PropertyType::Unknown { existing.property_type.clone() } else { property.property_type },
+                        listing_type: property.listing_type, // Always update listing status
+                        date: property.date.or(existing.date),
+                        coordinates: property.coordinates.or(existing.coordinates),
+                        address: property.address.or(existing.address.clone()),
+                        size_living: property.size_living.or(existing.size_living.clone()),
+                        size_ground: property.size_ground.or(existing.size_ground.clone()),
                         // Keep the earliest first_seen date
                         first_seen: existing.first_seen.or(property.first_seen),
                         // Use the latest last_seen date
@@ -432,19 +432,19 @@ pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property>
                         last_seen: existing.last_seen.or(property.last_seen),
                     }
                 } else {
-                    // Normal property update - use new data but preserve tracking dates
+                    // Normal property update - use new data but preserve existing data when scraper fails
                     Property {
                         url: property.url.clone(),
-                        name: property.name,
-                        price: property.price,
-                        location: property.location,
-                        property_type: property.property_type,
-                        listing_type: property.listing_type,
-                        date: property.date,
-                        coordinates: property.coordinates,
-                        address: property.address,
-                        size_living: property.size_living,
-                        size_ground: property.size_ground,
+                        name: if property.name.is_empty() || property.name == "Unknown Property" || property.name == "Unavailable Property" { existing.name.clone() } else { property.name },
+                        price: if property.price.is_empty() || property.price == "Unknown" || property.price == "Unavailable" { existing.price.clone() } else { property.price },
+                        location: if property.location.is_empty() || property.location == "Unknown" { existing.location.clone() } else { property.location },
+                        property_type: if property.property_type == PropertyType::Unknown { existing.property_type.clone() } else { property.property_type },
+                        listing_type: property.listing_type, // Always update listing status
+                        date: property.date.or(existing.date),
+                        coordinates: property.coordinates.or(existing.coordinates),
+                        address: property.address.or(existing.address.clone()),
+                        size_living: property.size_living.or(existing.size_living.clone()),
+                        size_ground: property.size_ground.or(existing.size_ground.clone()),
                         // Keep the earliest first_seen date
                         first_seen: existing.first_seen.or(property.first_seen),
                         // Use the latest last_seen date
