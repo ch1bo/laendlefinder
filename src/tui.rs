@@ -206,7 +206,7 @@ impl ScraperTUI {
             execute!(
                 io::stdout(),
                 SetForegroundColor(Color::DarkGrey),
-                Print(format!("  ⏳ {}\n", Self::truncate_url(&url))),
+                Print(format!("  ⏳ {}\n", &url)),
                 ResetColor
             )?;
             self.visible_lines += 1;
@@ -464,20 +464,13 @@ impl ScraperTUI {
         execute!(
             io::stdout(),
             SetForegroundColor(color),
-            Print(format!("  {} {}\n", icon, Self::truncate_url(&property_line.url))),
+            Print(format!("  {} {}\n", icon, &property_line.url)),
             ResetColor
         )?;
 
         Ok(())
     }
 
-    fn truncate_url(url: &str) -> String {
-        if url.len() > 80 {
-            format!("{}...", &url[..77])
-        } else {
-            url.to_string()
-        }
-    }
 
     /// Print the progress bar for the first time
     fn print_progress_bar(&self) -> io::Result<()> {
