@@ -61,8 +61,27 @@ pub fn scrape_single_url<T: PlatformScraper>(
     let mut all_properties = utils::load_properties_from_csv(&options.output_file)?;
     tui.show_summary(all_properties.len())?;
 
-    // 2. Find existing entry position for in-place update
-    let existing_position = all_properties.iter().position(|p| p.url == url);
+    // 2. Find existing entry position for in-place update (check both URL and property ID)
+    let mut existing_position = all_properties.iter().position(|p| p.url == url);
+    
+    // If not found by URL, check by property ID for laendleimmo URLs
+    if existing_position.is_none() {
+        if let Some(property_id) = utils::extract_property_id(url) {
+            if url.contains("laendleimmo.at") {
+                existing_position = all_properties.iter().position(|p| {
+                    if let Some(existing_id) = utils::extract_property_id(&p.url) {
+                        existing_id == property_id && p.url.contains("laendleimmo.at")
+                    } else {
+                        false
+                    }
+                });
+                if let Some(pos) = existing_position {
+                    debug_println!("Found existing entry by property ID {} at position {}: existing URL {} vs new URL {}", 
+                                 property_id, pos, all_properties[pos].url, url);
+                }
+            }
+        }
+    }
     
     if let Some(pos) = existing_position {
         debug_println!("Found existing entry at position {} for URL: {}", pos, url);
@@ -79,12 +98,29 @@ pub fn scrape_single_url<T: PlatformScraper>(
             // Handle single property update in-place to preserve order
             let merged_property = if let Some(pos) = existing_position {
                 let existing = &all_properties[pos];
+                
+                // Determine which URL to use - prefer the more recent or more specific one
+                let final_url = if property.url != existing.url {
+                    // URLs are different - this happens when property type classification changes
+                    // Use the new URL if it has better classification or if property is becoming available again
+                    if property.listing_type == ListingType::Available || 
+                       (property.property_type != PropertyType::Unknown && existing.property_type == PropertyType::Unknown) {
+                        debug_println!("Updating URL from {} to {} (better classification or became available)", 
+                                     existing.url, property.url);
+                        property.url.clone()
+                    } else {
+                        existing.url.clone()
+                    }
+                } else {
+                    property.url.clone()
+                };
+                
                 // Property already exists, merge the data intelligently
                 if property.listing_type == ListingType::Unavailable && existing.listing_type != ListingType::Unavailable {
                     // Property became unavailable - preserve all existing data except status and dates
-                    debug_println!("Property became unavailable, preserving existing data: {}", property.url);
+                    debug_println!("Property became unavailable, preserving existing data: {}", final_url);
                     Property {
-                        url: property.url.clone(),
+                        url: final_url,
                         name: if existing.name != "Unknown Property" && existing.name != "Unavailable Property" { existing.name.clone() } else { property.name },
                         price: existing.price.clone(), // Always preserve existing price when becoming unavailable
                         location: if existing.location != "Unknown" { existing.location.clone() } else { property.location },
@@ -103,7 +139,7 @@ pub fn scrape_single_url<T: PlatformScraper>(
                 } else {
                     // Normal property update - use new data but preserve existing data when scraper fails
                     Property {
-                        url: property.url.clone(),
+                        url: final_url,
                         name: if property.name.is_empty() || property.name == "Unknown Property" || property.name == "Unavailable Property" { existing.name.clone() } else { property.name },
                         price: if property.price.is_empty() || property.price == "Unknown" || property.price == "Unavailable" { existing.price.clone() } else { property.price },
                         location: if property.location.is_empty() || property.location == "Unknown" { existing.location.clone() } else { property.location },
@@ -396,26 +432,68 @@ pub fn run_scraper_with_options<T: PlatformScraper>(
     Ok(())
 }
 
-/// Deduplicate properties by URL, merging first_seen/last_seen dates properly
+/// Deduplicate properties by URL and property ID, merging first_seen/last_seen dates properly
 /// PRESERVES ORDER: Updates existing properties in-place, appends new ones at the end
+/// For laendleimmo.at URLs, also checks for duplicates by property ID to handle URL structure changes
 pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property> {
     let mut result = Vec::new();
     let mut seen_urls = std::collections::HashSet::new();
+    let mut seen_property_ids = std::collections::HashMap::new(); // property_id -> index in result
     
     // First pass: collect all unique properties in original order
     for property in properties {
-        if !seen_urls.contains(&property.url) {
+        let property_id = utils::extract_property_id(&property.url);
+        let mut existing_pos = None;
+        
+        // Check for existing URL first
+        if seen_urls.contains(&property.url) {
+            existing_pos = result.iter().position(|p: &Property| p.url == property.url);
+        }
+        // If not found by URL but we have a property ID, check by property ID for laendleimmo
+        else if let Some(id) = &property_id {
+            if property.url.contains("laendleimmo.at") {
+                if let Some(&index) = seen_property_ids.get(id) {
+                    existing_pos = Some(index);
+                    debug_println!("Found duplicate property by ID {}: existing URL {} vs new URL {}", 
+                                 id, result[index].url, property.url);
+                }
+            }
+        }
+        
+        if existing_pos.is_none() {
+            // New property
             seen_urls.insert(property.url.clone());
+            if let Some(id) = property_id {
+                if property.url.contains("laendleimmo.at") {
+                    seen_property_ids.insert(id, result.len());
+                }
+            }
             result.push(property);
         } else {
             // Find existing property and merge
-            if let Some(existing_pos) = result.iter().position(|p| p.url == property.url) {
+            if let Some(existing_pos) = existing_pos {
                 let existing = &result[existing_pos];
+                // Determine which URL to use - prefer the more recent or more specific one
+                let final_url = if property.url != existing.url {
+                    // URLs are different - this happens when property type classification changes
+                    // Use the new URL if it has better classification or if property is becoming available again
+                    if property.listing_type == ListingType::Available || 
+                       (property.property_type != PropertyType::Unknown && existing.property_type == PropertyType::Unknown) {
+                        debug_println!("Updating URL from {} to {} (better classification or became available)", 
+                                     existing.url, property.url);
+                        property.url.clone()
+                    } else {
+                        existing.url.clone()
+                    }
+                } else {
+                    property.url.clone()
+                };
+                
                 let merged_property = if property.listing_type == ListingType::Unavailable && existing.listing_type != ListingType::Unavailable {
                     // Property became unavailable - preserve all existing data except status and dates
-                    debug_println!("Property became unavailable, preserving existing data: {}", property.url);
+                    debug_println!("Property became unavailable, preserving existing data: {}", final_url);
                     Property {
-                        url: property.url.clone(),
+                        url: final_url,
                         name: if existing.name != "Unknown Property" && existing.name != "Unavailable Property" { existing.name.clone() } else { property.name },
                         price: existing.price.clone(), // Always preserve existing price when becoming unavailable
                         location: if existing.location != "Unknown" { existing.location.clone() } else { property.location },
@@ -434,7 +512,7 @@ pub fn deduplicate_properties_by_url(properties: Vec<Property>) -> Vec<Property>
                 } else {
                     // Normal property update - use new data but preserve existing data when scraper fails
                     Property {
-                        url: property.url.clone(),
+                        url: final_url,
                         name: if property.name.is_empty() || property.name == "Unknown Property" || property.name == "Unavailable Property" { existing.name.clone() } else { property.name },
                         price: if property.price.is_empty() || property.price == "Unknown" || property.price == "Unavailable" { existing.price.clone() } else { property.price },
                         location: if property.location.is_empty() || property.location == "Unknown" { existing.location.clone() } else { property.location },

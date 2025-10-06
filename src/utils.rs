@@ -17,6 +17,28 @@ pub fn sanitize_url(url: &str) -> String {
     url.to_string()
 }
 
+/// Extract property ID from laendleimmo.at URL
+/// 
+/// laendleimmo.at URLs follow the pattern: /immobilien/{type}/{subtype}/vorarlberg/{district}/{id}
+/// This function extracts the {id} part which uniquely identifies a property regardless of its classification.
+pub fn extract_property_id(url: &str) -> Option<String> {
+    if url.contains("laendleimmo.at") {
+        // First sanitize the URL to remove query parameters
+        let clean_url = sanitize_url(url);
+        
+        // Remove trailing slash if present
+        let clean_url = clean_url.trim_end_matches('/');
+        
+        // Split by '/' and take the last segment as the property ID
+        if let Some(id) = clean_url.split('/').last() {
+            if !id.is_empty() {
+                return Some(id.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Get a random user agent from a pool of common desktop browsers
 /// 
 /// This function returns different user agents for Chrome, Firefox, Safari and Edge
@@ -102,6 +124,42 @@ mod tests {
         assert_eq!(
             sanitize_url("https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456?source=feed&campaign=winter"),
             "https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456"
+        );
+    }
+
+    #[test]
+    fn test_extract_property_id() {
+        // Test normal laendleimmo URL
+        assert_eq!(
+            extract_property_id("https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456"),
+            Some("123456".to_string())
+        );
+
+        // Test URL with query parameters
+        assert_eq!(
+            extract_property_id("https://www.laendleimmo.at/immobilien/grundstuck/baugrundstuck/vorarlberg/feldkirch/9ijlG7WYVxx?source=feed"),
+            Some("9ijlG7WYVxx".to_string())
+        );
+
+        // Test different property types but same ID
+        assert_eq!(
+            extract_property_id("https://www.laendleimmo.at/immobilien/haus/einfamilienhaus/vorarlberg/feldkirch/9ijlG7WYVxx"),
+            Some("9ijlG7WYVxx".to_string())
+        );
+
+        // Test non-laendleimmo URL
+        assert_eq!(
+            extract_property_id("https://www.vol.at/properties/123"),
+            None
+        );
+
+        // Test empty URL
+        assert_eq!(extract_property_id(""), None);
+
+        // Test URL ending with slash
+        assert_eq!(
+            extract_property_id("https://www.laendleimmo.at/immobilien/haus/villa/vorarlberg/bregenz/123456/"),
+            Some("123456".to_string())
         );
     }
 
