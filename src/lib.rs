@@ -7,3 +7,4 @@ pub mod common_scraper;
 pub mod scrapers;
 pub mod tui;
 pub mod debug;
+pub mod geocoding;

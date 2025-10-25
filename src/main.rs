@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use laendlefinder::common_scraper::{ScrapingOptions, run_scraper_with_options, scrape_single_url};
 use laendlefinder::scrapers::{VolScraper, LaendleimmoScraper};
-use laendlefinder::debug;
+use laendlefinder::{debug, utils, geocoding};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about = "Laendlefinder - Property Scraper for Vorarlberg")]
@@ -46,6 +46,10 @@ struct Args {
     /// Scrape a specific URL and update only that entry in the database
     #[clap(short = 'u', long)]
     url: Option<String>,
+    
+    /// Fill in missing coordinates using address/location geocoding
+    #[clap(short, long)]
+    locate: bool,
 }
 
 fn main() -> Result<()> {
@@ -57,6 +61,26 @@ fn main() -> Result<()> {
     if !args.debug {
         println!("Laendlefinder - Property Scraper for Vorarlberg");
         println!("===============================================");
+    }
+    
+    // If only --locate is specified, skip all scraping and just geocode
+    if args.locate && args.url.is_none() && !args.new && args.max_items.is_none() && args.max_pages.is_none() && args.refresh.is_none() {
+        if !args.debug {
+            println!("\n--- Geocoding Properties ---");
+        }
+        
+        // Load properties from CSV
+        let mut properties = utils::load_properties_from_csv(&args.output)?;
+        
+        // Geocode properties missing coordinates (saves automatically after each success)
+        let _geocoded_count = geocoding::geocode_properties(&mut properties, &args.output)?;
+        
+        if !args.debug {
+            println!("\n=== Geocoding completed ===");
+            println!("Results saved to: {}", args.output);
+        }
+        
+        return Ok(());
     }
     
     // Create scraping options
@@ -94,6 +118,20 @@ fn main() -> Result<()> {
             return Err(anyhow::anyhow!("Unsupported URL domain. Only vol.at and laendleimmo.at are supported."));
         }
         
+        // Handle --locate flag for single URL if specified
+        if args.locate {
+            // Load properties from CSV (includes the just-scraped property)
+            let mut properties = utils::load_properties_from_csv(&args.output)?;
+            
+            // Geocode only the specific property that was just scraped
+            let geocoded = geocoding::geocode_property_by_url(&mut properties, &url)?;
+            
+            if geocoded {
+                // Save updated properties back to CSV
+                utils::save_properties_to_csv(&properties, &args.output)?;
+            }
+        }
+
         if !args.debug {
             println!("URL scraping completed. Results saved to: {}", args.output);
         }
@@ -122,8 +160,21 @@ fn main() -> Result<()> {
         println!("Skipping laendleimmo.at scraper");
     }
     
+    // Handle --locate flag to geocode properties without coordinates (only when combined with scraping)
+    if args.locate {
+        if !args.debug {
+            println!("\n--- Geocoding Properties ---");
+        }
+        
+        // Load properties from CSV
+        let mut properties = utils::load_properties_from_csv(&args.output)?;
+        
+        // Geocode properties missing coordinates (saves automatically after each success)
+        let _geocoded_count = geocoding::geocode_properties(&mut properties, &args.output)?;
+    }
+
     if !args.debug {
-        println!("\n=== All scraping completed ===");
+        println!("\n=== All operations completed ===");
         println!("Results saved to: {}", args.output);
     }
     
